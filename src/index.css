@@ -2,6 +2,45 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Variables de tema y soporte claro/oscuro */
+:root {
+  --bg: #f8fafc;
+  --text: #0f172a;
+  --muted: #475569;
+  --card: #ffffff;
+  --accent: #2563eb;
+  --scroll-track: #f1f5f9;
+  --scroll-thumb: #cbd5e1;
+  --scroll-thumb-hover: #94a3b8;
+}
+
+/* Tema oscuro cuando se aplica la clase .dark o data-theme="dark" */
+.dark,
+:root[data-theme='dark'] {
+  --bg: #0b1220;
+  --text: #e6eef8;
+  --muted: #94a3b8;
+  --card: #0f1724;
+  --accent: #60a5fa;
+  --scroll-track: #0b1220;
+  --scroll-thumb: #1f2937;
+  --scroll-thumb-hover: #374151;
+}
+
+/* Respetar la preferencia del sistema si no hay clase explícita */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]):not(.light):not(.dark) {
+    --bg: #0b1220;
+    --text: #e6eef8;
+    --muted: #94a3b8;
+    --card: #0f1724;
+    --accent: #60a5fa;
+    --scroll-track: #0b1220;
+    --scroll-thumb: #1f2937;
+    --scroll-thumb-hover: #374151;
+  }
+}
+
 /* Reset básico y fuente global */
 *,
 *::before,
@@ -16,7 +55,9 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #f8fafc;
+  background-color: var(--bg);
+  color: var(--text);
+  transition: background-color .2s ease, color .2s ease;
 }
 
 code {
@@ -24,22 +65,22 @@ code {
     monospace;
 }
 
-/* Scrollbar personalizado (opcional, queda lindo con el diseño actual) */
+/* Scrollbar personalizado usando variables (opcional) */
 ::-webkit-scrollbar {
   width: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: var(--scroll-track);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: var(--scroll-thumb);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: var(--scroll-thumb-hover);
 }
 
 /* Mejora de inputs numéricos */
@@ -51,4 +92,16 @@ input[type="number"]::-webkit-outer-spin-button {
 
 input[type="number"] {
   -moz-appearance: textfield;
+}
+
+/* Utilidades adicionales: tarjetas y acentos usan variables */
+.card {
+  background-color: var(--card);
+  color: var(--text);
+  transition: background-color .2s ease, color .2s ease;
+}
+
+.btn-primary {
+  background-color: var(--accent);
+  color: white;
 }

@@ -1,5 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, Wallet, TrendingUp, Calendar, CheckCircle, PlusCircle, FileText, BarChart3, Home, Bell, ChevronRight, X, Edit2, DollarSign, RefreshCw, Landmark, PiggyBank, Target, Zap, Info, HelpCircle, ThumbsUp, ThumbsDown, AlertTriangle, AlertOctagon, Link2, ShieldAlert, Calculator, Lightbulb, CreditCard, Building2, ArrowDownCircle, ArrowUpCircle, Link, Settings, LogOut, User, Sliders } from 'lucide-react';
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from 'firebase/auth';
+import { getFirestore, doc, setDoc, getDoc, collection, addDoc, getDocs, deleteDoc, updateDoc, query, where } from 'firebase/firestore';
+import { Upload, Wallet, TrendingUp, Calendar, CheckCircle, PlusCircle, FileText, BarChart3, Home, Bell, ChevronRight, X, Edit2, DollarSign, RefreshCw, Landmark, PiggyBank, Target, Zap, Info, HelpCircle, ThumbsUp, ThumbsDown, AlertTriangle, AlertOctagon, Link2, ShieldAlert, Calculator, Lightbulb, CreditCard, Building2, ArrowDownCircle, ArrowUpCircle, Link, Settings, LogOut, User, Sliders, Trash2 } from 'lucide-react';
+
+// === FIREBASE CONFIG ===
+const firebaseConfig = {
+  apiKey: "AIzaSyB4EEjkZ_uC49ofhrLIeRnNQl3Vf2Z0Fyw",
+  authDomain: "app-finanzas-69299.firebaseapp.com",
+  projectId: "app-finanzas-69299",
+  storageBucket: "app-finanzas-69299.firebasestorage.app",
+  messagingSenderId: "688939238008",
+  appId: "1:688939238008:web:641bf694ea96c359cb638d",
+  measurementId: "G-DB38SHX68F"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const googleProvider = new GoogleAuthProvider();
 
 // === BASES DE DATOS ===
 const BANCOS_ARGENTINA = [
@@ -159,24 +178,30 @@ const calcularEstrategiaDeudas = (deudas) => {
 };
 
 // === COMPONENTE DE LOGIN ===
-const LoginScreen = ({ onLogin }) => {
-  const [loading, setLoading] = useState(false);
+const LoginScreen = ({ onLogin, loading }) => {
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   const handleGoogleLogin = async () => {
-    setLoading(true);
-    // Simulación de login con Google
-    // En producción, usar Firebase Auth:
-    // const provider = new GoogleAuthProvider();
-    // const result = await signInWithPopup(auth, provider);
-    setTimeout(() => {
-      onLogin({
-        uid: 'user_' + Date.now(),
-        displayName: 'Usuario Demo',
-        email: 'usuario@gmail.com',
-        photoURL: null
-      });
-    }, 1500);
+    setLoginLoading(true);
+    setError(null);
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      onLogin(result.user);
+    } catch (error) {
+      console.error('Error en login:', error);
+      setError('Error al iniciar sesión. Intentá de nuevo.');
+      setLoginLoading(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
+        <RefreshCw className="w-8 h-8 text-white animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
@@ -189,13 +214,19 @@ const LoginScreen = ({ onLogin }) => {
           <p className="text-slate-500">Control financiero personal para Argentina</p>
         </div>
 
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+            {error}
+          </div>
+        )}
+
         <div className="space-y-4">
           <button
             onClick={handleGoogleLogin}
-            disabled={loading}
+            disabled={loginLoading}
             className="w-full flex items-center justify-center gap-3 px-6 py-4 border-2 border-slate-200 rounded-xl hover:bg-slate-50 transition-all disabled:opacity-50"
           >
-            {loading ? (
+            {loginLoading ? (
               <RefreshCw className="w-5 h-5 animate-spin" />
             ) : (
               <>
@@ -231,6 +262,7 @@ const FinanzasApp = () => {
   // Auth
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState(false);
 
   // Data
   const [cuentas, setCuentas] = useState([]);
@@ -251,31 +283,137 @@ const FinanzasApp = () => {
   const [configAlertas, setConfigAlertas] = useState({
     habilitadas: true,
     tipoPorcentaje: true,
-    porcentajeAlerta: 75,      // Alertar cuando se use X% de ingresos
-    porcentajeCritico: 90,     // Alerta crítica
+    porcentajeAlerta: 75,
+    porcentajeCritico: 90,
     tipoMonto: false,
-    montoMaximoMensual: 0,     // Monto máximo de gastos mensuales
-    montoAlertaIndividual: 0,  // Alertar si un gasto individual supera este monto
+    montoMaximoMensual: 0,
+    montoAlertaIndividual: 0,
   });
 
-  // Simular carga inicial
+  // === FIREBASE AUTH LISTENER ===
   useEffect(() => {
-    const savedUser = localStorage.getItem('finanzas_user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
-    setLoading(false);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        setUser(firebaseUser);
+        await cargarDatosUsuario(firebaseUser.uid);
+      } else {
+        setUser(null);
+        setCuentas([]);
+        setMovimientos([]);
+        setDeudas([]);
+        setPeriodos([]);
+      }
+      setLoading(false);
+    });
+    return () => unsubscribe();
   }, []);
 
-  // Guardar user en localStorage
-  const handleLogin = (userData) => {
-    setUser(userData);
-    localStorage.setItem('finanzas_user', JSON.stringify(userData));
+  // === FIREBASE FUNCTIONS ===
+  const cargarDatosUsuario = async (userId) => {
+    setDataLoading(true);
+    try {
+      // Cargar cuentas
+      const cuentasSnap = await getDocs(collection(db, 'users', userId, 'cuentas'));
+      const cuentasData = cuentasSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setCuentas(cuentasData);
+
+      // Cargar movimientos
+      const movimientosSnap = await getDocs(collection(db, 'users', userId, 'movimientos'));
+      const movimientosData = movimientosSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setMovimientos(movimientosData);
+
+      // Cargar deudas
+      const deudasSnap = await getDocs(collection(db, 'users', userId, 'deudas'));
+      const deudasData = deudasSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setDeudas(deudasData);
+
+      // Cargar config
+      const configDoc = await getDoc(doc(db, 'users', userId, 'config', 'alertas'));
+      if (configDoc.exists()) {
+        setConfigAlertas(configDoc.data());
+      }
+    } catch (error) {
+      console.error('Error cargando datos:', error);
+    }
+    setDataLoading(false);
   };
 
-  const handleLogout = () => {
-    setUser(null);
-    localStorage.removeItem('finanzas_user');
+  const guardarCuenta = async (cuenta) => {
+    if (!user) return;
+    try {
+      const docRef = await addDoc(collection(db, 'users', user.uid, 'cuentas'), cuenta);
+      setCuentas([...cuentas, { ...cuenta, id: docRef.id }]);
+    } catch (error) {
+      console.error('Error guardando cuenta:', error);
+    }
+  };
+
+  const eliminarCuenta = async (cuentaId) => {
+    if (!user) return;
+    try {
+      await deleteDoc(doc(db, 'users', user.uid, 'cuentas', cuentaId));
+      setCuentas(cuentas.filter(c => c.id !== cuentaId));
+      // También eliminar movimientos asociados
+      const movsAsociados = movimientos.filter(m => m.cuentaId === cuentaId);
+      for (const mov of movsAsociados) {
+        await deleteDoc(doc(db, 'users', user.uid, 'movimientos', mov.id));
+      }
+      setMovimientos(movimientos.filter(m => m.cuentaId !== cuentaId));
+    } catch (error) {
+      console.error('Error eliminando cuenta:', error);
+    }
+  };
+
+  const guardarMovimiento = async (movimiento) => {
+    if (!user) return;
+    try {
+      const docRef = await addDoc(collection(db, 'users', user.uid, 'movimientos'), movimiento);
+      setMovimientos([...movimientos, { ...movimiento, id: docRef.id }]);
+    } catch (error) {
+      console.error('Error guardando movimiento:', error);
+    }
+  };
+
+  const guardarDeuda = async (deuda) => {
+    if (!user) return;
+    try {
+      const docRef = await addDoc(collection(db, 'users', user.uid, 'deudas'), deuda);
+      setDeudas([...deudas, { ...deuda, id: docRef.id }]);
+    } catch (error) {
+      console.error('Error guardando deuda:', error);
+    }
+  };
+
+  const eliminarDeuda = async (deudaId) => {
+    if (!user) return;
+    try {
+      await deleteDoc(doc(db, 'users', user.uid, 'deudas', deudaId));
+      setDeudas(deudas.filter(d => d.id !== deudaId));
+    } catch (error) {
+      console.error('Error eliminando deuda:', error);
+    }
+  };
+
+  const guardarConfigAlertas = async (config) => {
+    if (!user) return;
+    try {
+      await setDoc(doc(db, 'users', user.uid, 'config', 'alertas'), config);
+      setConfigAlertas(config);
+    } catch (error) {
+      console.error('Error guardando config:', error);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      setUser(null);
+      setCuentas([]);
+      setMovimientos([]);
+      setDeudas([]);
+    } catch (error) {
+      console.error('Error en logout:', error);
+    }
   };
 
   // Cálculos
@@ -299,7 +437,6 @@ const FinanzasApp = () => {
     const nuevoTotal = gastosTotalesMes + nuevoMonto;
     const nuevoPorcentaje = totalIngresosMes > 0 ? (nuevoTotal / totalIngresosMes) * 100 : 100;
 
-    // Alerta por porcentaje de ingresos
     if (configAlertas.tipoPorcentaje && totalIngresosMes > 0) {
       if (nuevoPorcentaje > 100) {
         alertas.push({ tipo: 'excede', mensaje: `Superarás tus ingresos por ${formatCurrency(nuevoTotal - totalIngresosMes)}`, prioridad: 1 });
@@ -310,14 +447,12 @@ const FinanzasApp = () => {
       }
     }
 
-    // Alerta por monto máximo mensual
     if (configAlertas.tipoMonto && configAlertas.montoMaximoMensual > 0) {
       if (nuevoTotal > configAlertas.montoMaximoMensual) {
         alertas.push({ tipo: 'monto_mensual', mensaje: `Superarás tu límite mensual de ${formatCurrency(configAlertas.montoMaximoMensual)}`, prioridad: 1 });
       }
     }
 
-    // Alerta por monto individual alto
     if (configAlertas.tipoMonto && configAlertas.montoAlertaIndividual > 0) {
       if (nuevoMonto > configAlertas.montoAlertaIndividual) {
         alertas.push({ tipo: 'monto_individual', mensaje: `Este gasto (${formatCurrency(nuevoMonto)}) supera tu alerta de ${formatCurrency(configAlertas.montoAlertaIndividual)}`, prioridad: 2 });
@@ -325,8 +460,6 @@ const FinanzasApp = () => {
     }
 
     if (alertas.length === 0) return null;
-    
-    // Retornar la alerta más prioritaria
     alertas.sort((a, b) => a.prioridad - b.prioridad);
     return alertas[0];
   };
@@ -367,23 +500,28 @@ const FinanzasApp = () => {
     reader.readAsText(file);
   };
 
-  const cargarFaltantes = () => {
-    const nuevos = reconciliacion.soloEnResumen.map(c => ({ ...c, cuentaId: cuentaActiva?.id, origenResumen: true }));
-    setMovimientos([...movimientos, ...nuevos]);
+  const cargarFaltantes = async () => {
+    for (const c of reconciliacion.soloEnResumen) {
+      await guardarMovimiento({ ...c, cuentaId: cuentaActiva?.id, origenResumen: true });
+    }
     if (scorePrecision) setHistorialScores([...historialScores, { ...scorePrecision, fecha: new Date().toISOString() }]);
     setReconciliacion(null);
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <RefreshCw className="w-8 h-8 text-white animate-spin" />
-      </div>
-    );
+  // === RENDER ===
+  if (!user) {
+    return <LoginScreen onLogin={setUser} loading={loading} />;
   }
 
-  if (!user) {
-    return <LoginScreen onLogin={handleLogin} />;
+  if (dataLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <RefreshCw className="w-8 h-8 text-slate-600 animate-spin mx-auto mb-4" />
+          <p className="text-slate-600">Cargando tus datos...</p>
+        </div>
+      </div>
+    );
   }
 
   // === DASHBOARD ===
@@ -420,7 +558,6 @@ const FinanzasApp = () => {
         <div className="w-full bg-slate-200 rounded-full h-4 overflow-hidden relative">
           <div className={`h-4 rounded-full transition-all ${porcentajeUsado > 100 ? 'bg-red-500' : porcentajeUsado > configAlertas.porcentajeCritico ? 'bg-amber-500' : 'bg-emerald-500'}`}
             style={{ width: `${Math.min(porcentajeUsado, 100)}%` }} />
-          {/* Marcadores de alertas */}
           {configAlertas.tipoPorcentaje && (
             <>
               <div className="absolute top-0 bottom-0 w-0.5 bg-amber-600" style={{ left: `${configAlertas.porcentajeAlerta}%` }} />
@@ -435,7 +572,6 @@ const FinanzasApp = () => {
           <span>100%</span>
         </div>
         
-        {/* Alerta de monto máximo */}
         {configAlertas.tipoMonto && configAlertas.montoMaximoMensual > 0 && (
           <div className="mt-3 p-2 bg-slate-50 rounded-lg text-sm flex justify-between">
             <span className="text-slate-600">Límite mensual configurado:</span>
@@ -453,7 +589,7 @@ const FinanzasApp = () => {
             <ArrowDownCircle className="w-5 h-5 text-emerald-600" /> Ingresos
           </h3>
           <button onClick={() => setModal('cuenta-debito')} className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm">
-            <PlusCircle className="w-4 h-4" />
+            <PlusCircle className="w-4 h-4" /> Agregar
           </button>
         </div>
         
@@ -477,7 +613,12 @@ const FinanzasApp = () => {
                       <p className="text-xs text-slate-500">{c.subtipo}</p>
                     </div>
                   </div>
-                  <p className="font-bold text-emerald-600">{formatCurrency(c.montoMensual)}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-bold text-emerald-600">{formatCurrency(c.montoMensual)}</p>
+                    <button onClick={() => eliminarCuenta(c.id)} className="p-1 text-slate-400 hover:text-red-500">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -492,7 +633,7 @@ const FinanzasApp = () => {
             <ArrowUpCircle className="w-5 h-5 text-rose-600" /> Tarjetas de Crédito
           </h3>
           <button onClick={() => setModal('cuenta-credito')} className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 text-white rounded-lg text-sm">
-            <PlusCircle className="w-4 h-4" />
+            <PlusCircle className="w-4 h-4" /> Agregar
           </button>
         </div>
         
@@ -716,7 +857,7 @@ const FinanzasApp = () => {
             <p className="text-sm text-slate-500">Recibir alertas al cargar consumos</p>
           </div>
           <input type="checkbox" checked={configAlertas.habilitadas} 
-            onChange={e => setConfigAlertas({...configAlertas, habilitadas: e.target.checked})}
+            onChange={e => guardarConfigAlertas({...configAlertas, habilitadas: e.target.checked})}
             className="w-6 h-6 rounded" />
         </label>
 
@@ -730,7 +871,7 @@ const FinanzasApp = () => {
               <p className="text-sm text-slate-500">Alertar cuando uses cierto % de tus ingresos</p>
             </div>
             <input type="checkbox" checked={configAlertas.tipoPorcentaje}
-              onChange={e => setConfigAlertas({...configAlertas, tipoPorcentaje: e.target.checked})}
+              onChange={e => guardarConfigAlertas({...configAlertas, tipoPorcentaje: e.target.checked})}
               className="w-6 h-6 rounded" />
           </label>
           
@@ -740,7 +881,7 @@ const FinanzasApp = () => {
                 <label className="block text-sm text-slate-600 mb-1">Alerta (amarillo)</label>
                 <div className="flex items-center gap-2">
                   <input type="number" value={configAlertas.porcentajeAlerta}
-                    onChange={e => setConfigAlertas({...configAlertas, porcentajeAlerta: parseInt(e.target.value) || 0})}
+                    onChange={e => guardarConfigAlertas({...configAlertas, porcentajeAlerta: parseInt(e.target.value) || 0})}
                     className="w-full p-3 border rounded-xl" />
                   <span className="text-slate-500">%</span>
                 </div>
@@ -749,7 +890,7 @@ const FinanzasApp = () => {
                 <label className="block text-sm text-slate-600 mb-1">Crítico (rojo)</label>
                 <div className="flex items-center gap-2">
                   <input type="number" value={configAlertas.porcentajeCritico}
-                    onChange={e => setConfigAlertas({...configAlertas, porcentajeCritico: parseInt(e.target.value) || 0})}
+                    onChange={e => guardarConfigAlertas({...configAlertas, porcentajeCritico: parseInt(e.target.value) || 0})}
                     className="w-full p-3 border rounded-xl" />
                   <span className="text-slate-500">%</span>
                 </div>
@@ -768,7 +909,7 @@ const FinanzasApp = () => {
               <p className="text-sm text-slate-500">Alertar por montos específicos</p>
             </div>
             <input type="checkbox" checked={configAlertas.tipoMonto}
-              onChange={e => setConfigAlertas({...configAlertas, tipoMonto: e.target.checked})}
+              onChange={e => guardarConfigAlertas({...configAlertas, tipoMonto: e.target.checked})}
               className="w-6 h-6 rounded" />
           </label>
           
@@ -777,7 +918,7 @@ const FinanzasApp = () => {
               <div>
                 <label className="block text-sm text-slate-600 mb-1">Límite mensual máximo</label>
                 <input type="number" value={configAlertas.montoMaximoMensual}
-                  onChange={e => setConfigAlertas({...configAlertas, montoMaximoMensual: parseInt(e.target.value) || 0})}
+                  onChange={e => guardarConfigAlertas({...configAlertas, montoMaximoMensual: parseInt(e.target.value) || 0})}
                   placeholder="Ej: 500000"
                   className="w-full p-3 border rounded-xl" />
                 <p className="text-xs text-slate-500 mt-1">Alertar si los gastos del mes superan este monto</p>
@@ -785,7 +926,7 @@ const FinanzasApp = () => {
               <div>
                 <label className="block text-sm text-slate-600 mb-1">Alerta por gasto individual</label>
                 <input type="number" value={configAlertas.montoAlertaIndividual}
-                  onChange={e => setConfigAlertas({...configAlertas, montoAlertaIndividual: parseInt(e.target.value) || 0})}
+                  onChange={e => guardarConfigAlertas({...configAlertas, montoAlertaIndividual: parseInt(e.target.value) || 0})}
                   placeholder="Ej: 50000"
                   className="w-full p-3 border rounded-xl" />
                 <p className="text-xs text-slate-500 mt-1">Alertar si un solo gasto supera este monto</p>
@@ -813,11 +954,11 @@ const FinanzasApp = () => {
     const [nombre, setNombre] = useState('');
     const [monto, setMonto] = useState('');
 
-    const guardar = () => {
-      setCuentas([...cuentas, {
-        id: Date.now().toString(), tipoCuenta: TIPOS_CUENTA.DEBITO, esIngreso: true,
+    const guardar = async () => {
+      await guardarCuenta({
+        tipoCuenta: TIPOS_CUENTA.DEBITO, esIngreso: true,
         subtipo, nombre: nombre || subtipo, montoMensual: parseFloat(monto)
-      }]);
+      });
       setModal(null);
     };
 
@@ -856,18 +997,18 @@ const FinanzasApp = () => {
     const [diaCierre, setDiaCierre] = useState('');
     const [diaVencimiento, setDiaVencimiento] = useState('');
 
-    const guardar = () => {
+    const guardar = async () => {
       const entidadNombre = tipoEntidad === 'billetera' 
         ? BILLETERAS_VIRTUALES.find(b => b.id === entidad)?.nombre 
         : BANCOS_ARGENTINA.find(b => b.id === entidad)?.nombre;
       
-      setCuentas([...cuentas, {
-        id: Date.now().toString(), tipoCuenta: TIPOS_CUENTA.CREDITO, esIngreso: false,
+      await guardarCuenta({
+        tipoCuenta: TIPOS_CUENTA.CREDITO, esIngreso: false,
         tipoEntidad, entidad: entidadNombre,
         tipoTarjeta: TIPOS_TARJETA.find(t => t.id === tipoTarjeta)?.nombre,
         nombre: nombre || `${tipoTarjeta} ${entidadNombre}`,
         diaCierre: parseInt(diaCierre), diaVencimiento: parseInt(diaVencimiento)
-      }]);
+      });
       setModal(null);
     };
 
@@ -940,11 +1081,11 @@ const FinanzasApp = () => {
       }
     };
 
-    const guardarConsumo = () => {
-      setMovimientos([...movimientos, {
-        id: Date.now().toString(), descripcion: desc, monto: montoNum, categoria, fecha,
+    const guardarConsumo = async () => {
+      await guardarMovimiento({
+        descripcion: desc, monto: montoNum, categoria, fecha,
         cuentaId: cuentaActiva?.id, origenResumen: false
-      }]);
+      });
       setModal(null);
     };
 
@@ -1030,13 +1171,13 @@ const FinanzasApp = () => {
     const [tasa, setTasa] = useState('');
     const [cuentaVinculada, setCuentaVinculada] = useState(cuentaActiva?.id || '');
 
-    const guardar = () => {
-      setDeudas([...deudas, {
-        id: Date.now().toString(), nombre, tipo,
+    const guardar = async () => {
+      await guardarDeuda({
+        nombre, tipo,
         cuotaMensual: parseFloat(cuota), cuotasTotales: parseInt(totales), cuotasRestantes: parseInt(restantes),
         tasaInteres: parseFloat(tasa) || 0, saldoPendiente: parseFloat(cuota) * parseInt(restantes),
         cuentaId: cuentaVinculada || null
-      }]);
+      });
       setModal(null);
     };
 
@@ -1102,9 +1243,12 @@ const FinanzasApp = () => {
               <p className="text-xs text-slate-500">{user.email}</p>
             </div>
           </div>
-          <button onClick={handleLogout} className="p-2 text-slate-400 hover:text-slate-600">
-            <LogOut className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {user.photoURL && <img src={user.photoURL} alt="" className="w-8 h-8 rounded-full" />}
+            <button onClick={handleLogout} className="p-2 text-slate-400 hover:text-slate-600">
+              <LogOut className="w-5 h-5" />
+            </button>
+          </div>
         </div>
       </header>
 
@@ -1116,7 +1260,7 @@ const FinanzasApp = () => {
             <div className="flex justify-between items-center">
               <h2 className="text-xl font-bold">Deudas</h2>
               <button onClick={() => setModal('deuda')} className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-xl text-sm">
-                <PlusCircle className="w-4 h-4" />
+                <PlusCircle className="w-4 h-4" /> Agregar
               </button>
             </div>
             
@@ -1148,6 +1292,9 @@ const FinanzasApp = () => {
                         <p className="text-xs text-slate-500">{d.tipo} • Tasa: {d.tasaInteres}%</p>
                       </div>
                       <p className="font-bold">{formatCurrency(d.cuotaMensual)}/mes</p>
+                      <button onClick={() => eliminarDeuda(d.id)} className="p-1 text-slate-400 hover:text-red-500">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
                 ))}

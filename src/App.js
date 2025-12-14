@@ -1,11 +1,19 @@
 // app.js - lógica JS principal sin HTML estático.
-// Asegúrate de mover todo el markup estático a index.html y dejar en este archivo
-// solo la lógica que manipula el DOM, listeners, fetches y render dinámico.
+// Corregido: evita errores si #theme-toggle o #app-root no existen,
+// y añade mensajes de diagnóstico para el caso React.
 
 document.addEventListener('DOMContentLoaded', () => {
   const themeToggle = document.getElementById('theme-toggle');
   const root = document.documentElement;
-  const appRoot = document.getElementById('app-root');
+  let appRoot = document.getElementById('app-root');
+
+  // Si no existe #app-root, intentamos crear uno para que el resto no falle.
+  if (!appRoot) {
+    console.warn('No se encontró #app-root en el DOM. Se creará uno automáticamente.');
+    appRoot = document.createElement('main');
+    appRoot.id = 'app-root';
+    document.body.appendChild(appRoot);
+  }
 
   // 1) Manejo de tema (persistencia en localStorage)
   const getSavedTheme = () => {
@@ -17,42 +25,53 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const applyTheme = (theme) => {
     root.classList.toggle('dark', theme === 'dark');
-    themeToggle.textContent = theme === 'dark' ? '☀️' : '🌙';
+
+    // Solo acceder a themeToggle si existe
+    if (themeToggle) {
+      try {
+        themeToggle.textContent = theme === 'dark' ? '☀️' : '🌙';
+      } catch (err) {
+        console.warn('No se pudo actualizar el contenido de #theme-toggle:', err);
+      }
+    } else {
+      // Opción: si no existe, no hacemos nada. Puedes crear el botón si lo deseas.
+    }
+
     localStorage.setItem('theme', theme);
   };
 
-  applyTheme(getSavedTheme());
+  // Inicializar solo si el DOM está listo
+  try {
+    applyTheme(getSavedTheme());
+  } catch (err) {
+    console.error('Error aplicando tema inicial:', err);
+  }
 
-  themeToggle.addEventListener('click', () => {
-    const newTheme = root.classList.contains('dark') ? 'light' : 'dark';
-    applyTheme(newTheme);
-  });
+  if (themeToggle) {
+    themeToggle.addEventListener('click', () => {
+      const newTheme = root.classList.contains('dark') ? 'light' : 'dark';
+      applyTheme(newTheme);
+    });
+  } else {
+    console.info('No se agregó listener de tema porque #theme-toggle no existe. Añade <button id="theme-toggle"> en tu index.html si quieres el control visual.');
+  }
 
   // 2) Ejemplo de cómo migrar render que antes estaba en strings:
-  // Si antes hacías appRoot.innerHTML = `...` con todo el contenido,
-  // es válido usar innerHTML para partes dinámicas, pero intenta mantener
-  // la estructura base en index.html y actualizar solo los nodos necesarios.
-
-  // Ejemplo: renderizar una lista de transacciones dinámicamente
   function renderTransactions(transactions = []) {
-    // Busca un contenedor dentro del HTML (crealo en index.html si hace falta)
     let list = appRoot.querySelector('#transactions-list');
     if (!list) {
-      // Si no existe, creamos uno (esto es solo ejemplo)
       list = document.createElement('div');
       list.id = 'transactions-list';
       appRoot.appendChild(list);
     }
-    // Render de forma segura
     list.innerHTML = transactions.map(tx => `
       <div class="app-card transaction">
         <div class="tx-desc">${escapeHtml(tx.desc)}</div>
-        <div class="tx-amount">${tx.amount}</div>
+        <div class="tx-amount">${escapeHtml(tx.amount)}</div>
       </div>
     `).join('');
   }
 
-  // Helper básico para escapar HTML cuando inyectes strings
   function escapeHtml(str = '') {
     return String(str)
       .replace(/&/g, '&amp;')
@@ -62,19 +81,13 @@ document.addEventListener('DOMContentLoaded', () => {
       .replace(/'/g, '&#039;');
   }
 
-  // 3) Integra aquí el resto de tu lógica original:
-  // - listeners de formularios
-  // - fetch / localStorage de datos
-  // - funciones que antes generaban HTML estático: cambialas para que
-  //   actualicen nodos dentro de #app-root en lugar de contener todo el HTML
-  //
-  // Ejemplo de inicialización con datos de prueba:
+  // Datos de demo
   const demo = [
     { desc: 'Compra supermercado', amount: '-$45.00' },
     { desc: 'Sueldo', amount: '+$1200.00' },
   ];
   renderTransactions(demo);
 
-  // Si quieres que te convierta tus funciones existentes para que trabajen
-  // con #app-root, pégalas aquí y te ayudo a adaptarlas.
+  // Si usas React en la misma página: asegúrate que el root que usa React exista.
+  // Si recibes el error Minified React error #130, revisa los puntos explicados abajo.
 });

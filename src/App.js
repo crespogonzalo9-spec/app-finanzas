@@ -888,7 +888,7 @@ const MonityApp = () => {
                         <button onClick={(e) => { e.stopPropagation(); setMovimientoEditar(m); setModal('editar-consumo'); }} className="p-1 text-blue-500 hover:bg-blue-50 rounded">
                           <Edit3 className="w-4 h-4" />
                         </button>
-                        <button onClick={(e) => { e.stopPropagation(); if(confirm('¿Eliminar este consumo?')) eliminarMovimiento(m.id); }} className="p-1 text-red-500 hover:bg-red-50 rounded">
+                        <button onClick={(e) => { e.stopPropagation(); if(window.confirm('¿Eliminar este consumo?')) eliminarMovimiento(m.id); }} className="p-1 text-red-500 hover:bg-red-50 rounded">
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>

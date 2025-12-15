@@ -95,6 +95,14 @@ const calcularPeriodoActual = (diaCierre) => {
   }
 };
 
+const formatDayMonth = (isoDate) => {
+  if (!isoDate) return '';
+  const d = new Date(isoDate);
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  return `${dd}/${mm}`;
+};
+
 const detectarCategoria = (desc) => {
   const d = desc.toLowerCase();
   if (/mercado|carrefour|coto|walmart|jumbo/i.test(d)) return 'supermercado';
@@ -692,8 +700,11 @@ const FinanzasApp = () => {
                   </div>
                   
                   {periodo && (
-                    <div className="bg-slate-50 rounded-lg p-2 text-xs flex justify-between">
-                      <span>Cierre: {formatDate(periodo.fechaCierre)}</span>
+                    <div className="bg-slate-50 rounded-lg p-2 text-xs flex justify-between items-center">
+                      <div className="text-sm">
+                        <div><strong>Cierre:</strong> {c.diaCierreLabel ? c.diaCierreLabel : formatDayMonth(periodo.fechaCierre)}</div>
+                        <div><strong>Venc:</strong> {c.diaVencimientoLabel ? c.diaVencimientoLabel : (periodo.fechaVencimiento ? formatDayMonth(periodo.fechaVencimiento) : 'Pendiente')}</div>
+                      </div>
                       {diasCierre !== null && diasCierre >= 0 && (
                         <span className={diasCierre <= 3 ? 'text-red-600 font-semibold' : 'text-slate-600'}>
                           {diasCierre === 0 ? 'Hoy' : `${diasCierre} días`}
@@ -743,11 +754,11 @@ const FinanzasApp = () => {
             <div className="grid grid-cols-3 gap-4 text-sm">
               <div>
                 <p className="text-slate-500">Cierre</p>
-                <p className="font-semibold">{formatDate(periodo.fechaCierre)}</p>
+                <p className="font-semibold">{cuentaActiva.diaCierreLabel ? cuentaActiva.diaCierreLabel : formatDayMonth(periodo.fechaCierre)}</p>
               </div>
               <div>
                 <p className="text-slate-500">Vencimiento</p>
-                <p className="font-semibold">{periodo.fechaVencimiento ? formatDate(periodo.fechaVencimiento) : 'Pendiente'}</p>
+                <p className="font-semibold">{cuentaActiva.diaVencimientoLabel ? cuentaActiva.diaVencimientoLabel : (periodo.fechaVencimiento ? formatDayMonth(periodo.fechaVencimiento) : 'Pendiente')}</p>
               </div>
               <div>
                 <p className="text-slate-500">Total</p>
@@ -1029,18 +1040,37 @@ const FinanzasApp = () => {
     const [nombre, setNombre] = useState('');
     const [diaCierre, setDiaCierre] = useState('');
     const [diaVencimiento, setDiaVencimiento] = useState('');
+    const [diaCierreLabel, setDiaCierreLabel] = useState('');
+    const [diaVencimientoLabel, setDiaVencimientoLabel] = useState('');
 
     const guardar = async () => {
       const entidadNombre = tipoEntidad === 'billetera' 
         ? BILLETERAS_VIRTUALES.find(b => b.id === entidad)?.nombre 
         : BANCOS_ARGENTINA.find(b => b.id === entidad)?.nombre;
       
+      const pad2 = (n) => String(n).padStart(2, '0');
+      const parseLabel = (label, dayFallback) => {
+        if (!label) {
+          const d = parseInt(dayFallback) || 1;
+          const m = new Date().getMonth() + 1;
+          return { day: d, label: `${pad2(d)}/${pad2(m)}` };
+        }
+        const parts = label.split('/').map(p => p.trim());
+        const day = parseInt(parts[0]) || parseInt(dayFallback) || 1;
+        const month = parts[1] ? parseInt(parts[1]) : (new Date().getMonth() + 1);
+        return { day, label: `${pad2(day)}/${pad2(month)}` };
+      };
+
+      const cierre = parseLabel(diaCierreLabel, diaCierre);
+      const venc = parseLabel(diaVencimientoLabel, diaVencimiento);
+
       await guardarCuenta({
         tipoCuenta: TIPOS_CUENTA.CREDITO, esIngreso: false,
         tipoEntidad, entidad: entidadNombre,
         tipoTarjeta: TIPOS_TARJETA.find(t => t.id === tipoTarjeta)?.nombre,
         nombre: nombre || `${tipoTarjeta} ${entidadNombre}`,
-        diaCierre: parseInt(diaCierre), diaVencimiento: parseInt(diaVencimiento)
+        diaCierre: cierre.day, diaVencimiento: venc.day,
+        diaCierreLabel: cierre.label, diaVencimientoLabel: venc.label
       });
       setModal(null);
     };
@@ -1078,11 +1108,11 @@ const FinanzasApp = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm text-slate-600 mb-1">Día de cierre</label>
-                  <input type="number" min="1" max="31" value={diaCierre} onChange={e => setDiaCierre(e.target.value)} placeholder="15" className="w-full p-3 border rounded-xl" />
+                  <input type="text" value={diaCierreLabel || diaCierre} onChange={e => { setDiaCierreLabel(e.target.value); setDiaCierre(e.target.value.split('/')[0]); }} placeholder="DD/MM (ej: 15/05)" className="w-full p-3 border rounded-xl" />
                 </div>
                 <div>
                   <label className="block text-sm text-slate-600 mb-1">Día de vencimiento</label>
-                  <input type="number" min="1" max="31" value={diaVencimiento} onChange={e => setDiaVencimiento(e.target.value)} placeholder="5" className="w-full p-3 border rounded-xl" />
+                  <input type="text" value={diaVencimientoLabel || diaVencimiento} onChange={e => { setDiaVencimientoLabel(e.target.value); setDiaVencimiento(e.target.value.split('/')[0]); }} placeholder="DD/MM (ej: 05/06)" className="w-full p-3 border rounded-xl" />
                 </div>
               </div>
             </div>

@@ -353,6 +353,7 @@ const FinanzasApp = () => {
 
   const eliminarCuenta = async (cuentaId) => {
     if (!user) return;
+    if (!window.confirm('¿Eliminar esta cuenta y todos sus movimientos asociados? Esta acción no se puede deshacer.')) return;
     try {
       await deleteDoc(doc(db, 'users', user.uid, 'cuentas', cuentaId));
       setCuentas(cuentas.filter(c => c.id !== cuentaId));
@@ -362,6 +363,7 @@ const FinanzasApp = () => {
         await deleteDoc(doc(db, 'users', user.uid, 'movimientos', mov.id));
       }
       setMovimientos(movimientos.filter(m => m.cuentaId !== cuentaId));
+      showToast('Cuenta eliminada');
     } catch (error) {
       console.error('Error eliminando cuenta:', error);
     }
@@ -373,9 +375,16 @@ const FinanzasApp = () => {
     try {
       await deleteDoc(doc(db, 'users', user.uid, 'movimientos', movimientoId));
       setMovimientos(movimientos.filter(m => m.id !== movimientoId));
+      showToast('Movimiento eliminado');
     } catch (error) {
       console.error('Error eliminando movimiento:', error);
     }
+  };
+
+  const [toast, setToast] = useState(null);
+  const showToast = (msg, dur = 3000) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), dur);
   };
 
   const guardarMovimiento = async (movimiento) => {
@@ -674,7 +683,12 @@ const FinanzasApp = () => {
                       <p className="font-semibold">{c.nombre}</p>
                       <p className="text-xs text-slate-500">{c.entidad}</p>
                     </div>
-                    <p className="font-bold text-rose-600">{formatCurrency(total)}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-bold text-rose-600">{formatCurrency(total)}</p>
+                        <button onClick={(e) => { e.stopPropagation(); eliminarCuenta(c.id); }} className="p-1 text-slate-400 hover:text-red-500">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                   </div>
                   
                   {periodo && (
@@ -1342,6 +1356,12 @@ const FinanzasApp = () => {
       {modal === 'cuenta-credito' && <ModalCuentaCredito />}
       {modal === 'consumo' && <ModalConsumo />}
       {modal === 'deuda' && <ModalDeuda />}
+
+      {toast && (
+        <div className="fixed top-6 right-6 bg-slate-900 text-white px-4 py-2 rounded shadow-md z-50">
+          {toast}
+        </div>
+      )}
     </div>
   );
 };

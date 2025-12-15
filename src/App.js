@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from 'firebase/auth';
-import { getFirestore, doc, setDoc, getDoc, collection, addDoc, getDocs, deleteDoc, updateDoc, query, where } from 'firebase/firestore';
-import { Upload, Wallet, TrendingUp, Calendar, CheckCircle, PlusCircle, FileText, BarChart3, Home, Bell, ChevronRight, X, Edit2, DollarSign, RefreshCw, Landmark, PiggyBank, Target, Zap, Info, HelpCircle, ThumbsUp, ThumbsDown, AlertTriangle, AlertOctagon, Link2, ShieldAlert, Calculator, Lightbulb, CreditCard, Building2, ArrowDownCircle, ArrowUpCircle, Link, Settings, LogOut, User, Sliders, Trash2 } from 'lucide-react';
+import { getFirestore, doc, setDoc, getDoc, collection, addDoc, getDocs, deleteDoc } from 'firebase/firestore';
+import { Upload, Calendar, CheckCircle, PlusCircle, FileText, Home, ChevronRight, X, DollarSign, RefreshCw, Landmark, PiggyBank, AlertTriangle, ShieldAlert, CreditCard, ArrowDownCircle, ArrowUpCircle, Link, LogOut, Sliders, Trash2 } from 'lucide-react';
 
 // === FIREBASE CONFIG ===
 const firebaseConfig = {
@@ -107,7 +107,9 @@ const detectarCategoria = (desc) => {
 const analizarResumenIA = (texto) => {
   const resultado = { consumos: [], totalPagar: 0, fechaCierre: null, fechaVencimiento: null };
   
+  // eslint-disable-next-line no-useless-escape
   const matchCierre = texto.match(/cierre[:\s]*(\d{1,2})[\/\-](\d{1,2})[\/\-]?(\d{2,4})?/i);
+  // eslint-disable-next-line no-useless-escape
   const matchVto = texto.match(/vencimiento[:\s]*(\d{1,2})[\/\-](\d{1,2})[\/\-]?(\d{2,4})?/i);
   
   if (matchCierre) {
@@ -123,6 +125,7 @@ const analizarResumenIA = (texto) => {
   if (matchTotal) resultado.totalPagar = parseFloat(matchTotal[1].replace(/\./g, '').replace(',', '.'));
   
   texto.split('\n').forEach((linea, idx) => {
+    // eslint-disable-next-line no-useless-escape
     const match = linea.match(/(\d{1,2}[\/\-]\d{1,2})\s+(.+?)\s+(?:(\d+)\/(\d+)\s+)?(\$?\s*[\d.,]+)\s*$/);
     if (match) {
       const monto = parseFloat(match[5].replace(/[$\s.]/g, '').replace(',', '.'));
@@ -361,6 +364,17 @@ const FinanzasApp = () => {
       setMovimientos(movimientos.filter(m => m.cuentaId !== cuentaId));
     } catch (error) {
       console.error('Error eliminando cuenta:', error);
+    }
+  };
+
+  const eliminarMovimiento = async (movimientoId) => {
+    if (!user) return;
+    if (!window.confirm('¿Eliminar este movimiento? Esta acción no se puede deshacer.')) return;
+    try {
+      await deleteDoc(doc(db, 'users', user.uid, 'movimientos', movimientoId));
+      setMovimientos(movimientos.filter(m => m.id !== movimientoId));
+    } catch (error) {
+      console.error('Error eliminando movimiento:', error);
     }
   };
 
@@ -828,7 +842,12 @@ const FinanzasApp = () => {
                         <p className="text-xs text-slate-500">{m.fecha}</p>
                       </div>
                     </div>
-                    <p className="font-semibold">{formatCurrency(m.monto)}</p>
+                    <div className="flex items-center gap-3">
+                      <p className="font-semibold">{formatCurrency(m.monto)}</p>
+                      <button onClick={() => eliminarMovimiento(m.id)} className="p-1 text-slate-400 hover:text-red-500">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 );
               })}

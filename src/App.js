@@ -2,7 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, collection, addDoc, getDocs, deleteDoc, updateDoc } from 'firebase/firestore';
-import { Calendar, CheckCircle, PlusCircle, Home, ChevronRight, X, DollarSign, RefreshCw, PiggyBank, CreditCard, ArrowDownCircle, ArrowUpCircle, LogOut, Sliders, Trash2, Moon, Sun, Minus, Plus, Repeat } from 'lucide-react';
+import { Calendar, CheckCircle, PlusCircle, Home, ChevronRight, X, DollarSign, RefreshCw, CreditCard, ArrowDownCircle, ArrowUpCircle, LogOut, Sliders, Trash2, Moon, Sun, Minus, Plus, Repeat, Edit3, Bell, BellOff, AlertTriangle, Download } from 'lucide-react';
+
+// === LOGO MONITY ===
+const MonityLogo = ({ size = 40 }) => (
+  <svg width={size} height={size} viewBox="0 0 100 100">
+    <defs>
+      <linearGradient id="monityGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#6366f1" />
+        <stop offset="100%" stopColor="#8b5cf6" />
+      </linearGradient>
+    </defs>
+    <rect width="100" height="100" rx="22" fill="url(#monityGrad)" />
+    <path d="M25 65 L25 45 L35 55 L45 40 L55 55 L65 35 L75 50 L75 65" stroke="white" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    <circle cx="75" cy="35" r="8" fill="#22c55e" />
+  </svg>
+);
 
 // === FIREBASE CONFIG ===
 const firebaseConfig = {
@@ -174,20 +189,20 @@ const LoginScreen = ({ onLogin, loading, darkMode }) => {
 
   if (loading) {
     return (
-      <div className={`min-h-screen flex items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900'}`}>
+      <div className={`min-h-screen flex items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-gradient-to-br from-indigo-900 via-slate-800 to-slate-900'}`}>
         <RefreshCw className="w-8 h-8 text-white animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className={`min-h-screen flex items-center justify-center p-4 ${darkMode ? 'bg-gray-900' : 'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900'}`}>
+    <div className={`min-h-screen flex items-center justify-center p-4 ${darkMode ? 'bg-gray-900' : 'bg-gradient-to-br from-indigo-900 via-slate-800 to-slate-900'}`}>
       <div className={`rounded-3xl p-8 w-full max-w-md shadow-2xl ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
         <div className="text-center mb-8">
-          <div className="w-20 h-20 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-            <PiggyBank className="w-10 h-10 text-white" />
+          <div className="flex justify-center mb-4">
+            <MonityLogo size={80} />
           </div>
-          <h1 className={`text-3xl font-bold mb-2 ${darkMode ? 'text-white' : 'text-slate-800'}`}>MisFinanzas</h1>
+          <h1 className={`text-3xl font-bold mb-2 ${darkMode ? 'text-white' : 'text-slate-800'}`}>Monity</h1>
           <p className={darkMode ? 'text-gray-400' : 'text-slate-500'}>Control financiero personal</p>
         </div>
 
@@ -218,14 +233,14 @@ const LoginScreen = ({ onLogin, loading, darkMode }) => {
 };
 
 // === COMPONENTE PRINCIPAL ===
-const FinanzasApp = () => {
+const MonityApp = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [dataLoading, setDataLoading] = useState(false);
 
   // MODO OSCURO
   const [darkMode, setDarkMode] = useState(() => {
-    const saved = localStorage.getItem('misfinanzas_darkmode');
+    const saved = localStorage.getItem('monity_darkmode');
     return saved ? JSON.parse(saved) : false;
   });
 
@@ -240,10 +255,21 @@ const FinanzasApp = () => {
   const [tab, setTab] = useState('dashboard');
   const [modal, setModal] = useState(null);
   const [cuentaActiva, setCuentaActiva] = useState(null);
+  const [movimientoEditar, setMovimientoEditar] = useState(null);
+  const [alertaActiva, setAlertaActiva] = useState(null);
+
+  // Config alertas
+  const [config, setConfig] = useState({
+    notificaciones: false,
+    alertaGastoAlto: true,
+    montoAlertaGasto: 50000,
+    alertaPorcentaje: true,
+    porcentajeAlerta: 80
+  });
 
   // Guardar modo oscuro
   useEffect(() => {
-    localStorage.setItem('misfinanzas_darkmode', JSON.stringify(darkMode));
+    localStorage.setItem('monity_darkmode', JSON.stringify(darkMode));
   }, [darkMode]);
 
   // Theme
@@ -341,11 +367,57 @@ const FinanzasApp = () => {
   const guardarMovimiento = async (movimiento) => {
     if (!user) return;
     try {
+      // Verificar alertas antes de guardar
+      if (config.alertaGastoAlto && movimiento.monto >= config.montoAlertaGasto) {
+        setAlertaActiva({ tipo: 'gasto_alto', mensaje: `Este gasto de ${formatCurrency(movimiento.monto)} supera tu límite de alerta de ${formatCurrency(config.montoAlertaGasto)}` });
+      }
+      
       const docRef = await addDoc(collection(db, 'users', user.uid, 'movimientos'), movimiento);
       setMovimientos([...movimientos, { ...movimiento, id: docRef.id }]);
+      
+      // Verificar porcentaje de ingresos
+      if (config.alertaPorcentaje) {
+        const totalIngresos = cuentas.filter(c => c.tipo === 'ingreso').reduce((sum, c) => sum + (c.montoMensual || 0), 0);
+        const totalGastos = movimientos.reduce((sum, m) => sum + m.monto, 0) + movimiento.monto;
+        const porcentaje = totalIngresos > 0 ? (totalGastos / totalIngresos) * 100 : 0;
+        if (porcentaje >= config.porcentajeAlerta && !alertaActiva) {
+          setAlertaActiva({ tipo: 'porcentaje', mensaje: `¡Atención! Ya usaste el ${porcentaje.toFixed(0)}% de tus ingresos mensuales` });
+        }
+      }
+      
       return docRef.id;
     } catch (error) {
       console.error('Error guardando movimiento:', error);
+    }
+  };
+
+  const actualizarMovimiento = async (movimientoId, datos) => {
+    if (!user) return;
+    try {
+      await updateDoc(doc(db, 'users', user.uid, 'movimientos', movimientoId), datos);
+      setMovimientos(movimientos.map(m => m.id === movimientoId ? { ...m, ...datos } : m));
+    } catch (error) {
+      console.error('Error actualizando movimiento:', error);
+    }
+  };
+
+  const eliminarMovimiento = async (movimientoId) => {
+    if (!user) return;
+    try {
+      await deleteDoc(doc(db, 'users', user.uid, 'movimientos', movimientoId));
+      setMovimientos(movimientos.filter(m => m.id !== movimientoId));
+    } catch (error) {
+      console.error('Error eliminando movimiento:', error);
+    }
+  };
+
+  const guardarConfig = async (newConfig) => {
+    if (!user) return;
+    try {
+      await setDoc(doc(db, 'users', user.uid, 'config', 'general'), newConfig);
+      setConfig(newConfig);
+    } catch (error) {
+      console.error('Error guardando config:', error);
     }
   };
 
@@ -631,7 +703,7 @@ const FinanzasApp = () => {
           <h3 className={`font-semibold flex items-center gap-2 ${theme.text}`}>
             <ArrowUpCircle className="w-5 h-5 text-rose-500" /> Cuentas Contables
           </h3>
-          <button onClick={() => setModal('cuenta-contable')} className={`flex items-center gap-1 px-3 py-1.5 text-white rounded-lg text-sm ${darkMode ? 'bg-gray-600' : 'bg-slate-700'}`}>
+          <button onClick={() => setModal('cuenta-contable')} className={`flex items-center gap-1 px-3 py-1.5 text-white rounded-lg text-sm ${darkMode ? 'bg-gray-600' : 'bg-indigo-700'}`}>
             <PlusCircle className="w-4 h-4" /> Crear Cuenta
           </button>
         </div>
@@ -795,21 +867,33 @@ const FinanzasApp = () => {
             <div className={`border rounded-xl divide-y ${theme.card} ${theme.border}`}>
               {todosMovimientos.map((m, idx) => (
                 <div key={m.id + idx} className="p-4 flex justify-between items-center">
-                  <div className="flex items-center gap-3">
-                    <span className="text-xl">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <span className="text-xl flex-shrink-0">
                       {m.tipo === 'pago' ? '💰' : 
                        m.esCuota ? '🔄' :
                        m.esSaldoAnterior ? '📋' :
                        CATEGORIAS.find(c => c.id === m.categoria)?.icon || '📦'}
                     </span>
-                    <div>
-                      <p className={`font-medium ${theme.text}`}>{m.descripcion}</p>
+                    <div className="min-w-0">
+                      <p className={`font-medium truncate ${theme.text}`}>{m.descripcion}</p>
                       <p className={`text-xs ${theme.textMuted}`}>{formatDateShort(m.fecha)}</p>
                     </div>
                   </div>
-                  <p className={`font-semibold ${m.tipo === 'pago' ? 'text-emerald-500' : 'text-rose-500'}`}>
-                    {m.tipo === 'pago' ? '+' : '-'}{formatCurrency(m.monto)}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className={`font-semibold ${m.tipo === 'pago' ? 'text-emerald-500' : 'text-rose-500'}`}>
+                      {m.tipo === 'pago' ? '+' : '-'}{formatCurrency(m.monto)}
+                    </p>
+                    {m.tipo === 'consumo' && !m.esSaldoAnterior && !m.esCuota && (
+                      <div className="flex gap-1 ml-2">
+                        <button onClick={(e) => { e.stopPropagation(); setMovimientoEditar(m); setModal('editar-consumo'); }} className="p-1 text-blue-500 hover:bg-blue-50 rounded">
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); if(confirm('¿Eliminar este consumo?')) eliminarMovimiento(m.id); }} className="p-1 text-red-500 hover:bg-red-50 rounded">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -829,22 +913,83 @@ const FinanzasApp = () => {
         <h2 className={`text-xl font-bold ${theme.text}`}>Configuración</h2>
       </div>
 
-      <div className={`border rounded-xl p-6 ${theme.card}`}>
+      {/* Modo oscuro */}
+      <div className={`border rounded-xl p-4 ${theme.card}`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            {darkMode ? <Moon className="w-5 h-5 text-blue-400" /> : <Sun className="w-5 h-5 text-amber-500" />}
+            {darkMode ? <Moon className="w-5 h-5 text-indigo-400" /> : <Sun className="w-5 h-5 text-amber-500" />}
             <div>
               <p className={`font-semibold ${theme.text}`}>Modo oscuro</p>
               <p className={`text-sm ${theme.textMuted}`}>Cambiar apariencia</p>
             </div>
           </div>
-          <button 
-            onClick={() => setDarkMode(!darkMode)}
-            className={`w-14 h-8 rounded-full transition-colors ${darkMode ? 'bg-blue-600' : 'bg-slate-300'}`}
-          >
+          <button onClick={() => setDarkMode(!darkMode)}
+            className={`w-14 h-8 rounded-full transition-colors ${darkMode ? 'bg-indigo-600' : 'bg-slate-300'}`}>
             <div className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${darkMode ? 'translate-x-7' : 'translate-x-1'}`} />
           </button>
         </div>
+      </div>
+
+      {/* Alertas de consumo */}
+      <div className={`border rounded-xl p-4 space-y-4 ${theme.card}`}>
+        <h3 className={`font-semibold flex items-center gap-2 ${theme.text}`}>
+          <Bell className="w-5 h-5 text-amber-500" /> Alertas de Consumo
+        </h3>
+
+        {/* Alerta gasto alto */}
+        <div className="flex items-center justify-between">
+          <div>
+            <p className={`font-medium ${theme.text}`}>Alerta gasto alto</p>
+            <p className={`text-sm ${theme.textMuted}`}>Aviso cuando un gasto supere un monto</p>
+          </div>
+          <button onClick={() => guardarConfig({ ...config, alertaGastoAlto: !config.alertaGastoAlto })}
+            className={`w-12 h-6 rounded-full ${config.alertaGastoAlto ? 'bg-amber-500' : 'bg-slate-300'}`}>
+            <div className={`w-5 h-5 bg-white rounded-full shadow transform ${config.alertaGastoAlto ? 'translate-x-6' : 'translate-x-0.5'}`} />
+          </button>
+        </div>
+        
+        {config.alertaGastoAlto && (
+          <div>
+            <label className={`text-sm ${theme.textMuted}`}>Monto de alerta: {formatCurrency(config.montoAlertaGasto)}</label>
+            <input type="number" value={config.montoAlertaGasto}
+              onChange={e => guardarConfig({ ...config, montoAlertaGasto: parseInt(e.target.value) || 0 })}
+              className={`w-full p-2 mt-1 border rounded-lg ${theme.input}`} placeholder="50000" />
+          </div>
+        )}
+
+        <hr className={theme.border} />
+
+        {/* Alerta porcentaje */}
+        <div className="flex items-center justify-between">
+          <div>
+            <p className={`font-medium ${theme.text}`}>Alerta % ingresos</p>
+            <p className={`text-sm ${theme.textMuted}`}>Aviso al usar cierto % de ingresos</p>
+          </div>
+          <button onClick={() => guardarConfig({ ...config, alertaPorcentaje: !config.alertaPorcentaje })}
+            className={`w-12 h-6 rounded-full ${config.alertaPorcentaje ? 'bg-amber-500' : 'bg-slate-300'}`}>
+            <div className={`w-5 h-5 bg-white rounded-full shadow transform ${config.alertaPorcentaje ? 'translate-x-6' : 'translate-x-0.5'}`} />
+          </button>
+        </div>
+
+        {config.alertaPorcentaje && (
+          <div>
+            <label className={`text-sm ${theme.textMuted}`}>Alertar al {config.porcentajeAlerta}%</label>
+            <input type="range" min="50" max="100" value={config.porcentajeAlerta}
+              onChange={e => guardarConfig({ ...config, porcentajeAlerta: parseInt(e.target.value) })}
+              className="w-full mt-1" />
+          </div>
+        )}
+      </div>
+
+      {/* Info PWA */}
+      <div className={`border rounded-xl p-4 ${theme.card}`}>
+        <div className="flex items-center gap-3 mb-2">
+          <Download className="w-5 h-5 text-indigo-500" />
+          <p className={`font-semibold ${theme.text}`}>Instalar App</p>
+        </div>
+        <p className={`text-sm ${theme.textMuted}`}>
+          Podés instalar Monity en tu celular: abrí el menú del navegador y seleccioná "Agregar a pantalla de inicio"
+        </p>
       </div>
     </div>
   );
@@ -933,7 +1078,7 @@ const FinanzasApp = () => {
           </div>
           <div className={`p-6 border-t flex gap-3 ${theme.border}`}>
             <button onClick={() => setModal(null)} className={`flex-1 p-3 border rounded-xl ${theme.border} ${theme.text}`}>Cancelar</button>
-            <button onClick={guardar} disabled={!fechaCierre} className={`flex-1 p-3 text-white rounded-xl disabled:opacity-50 ${darkMode ? 'bg-gray-600' : 'bg-slate-700'}`}>Crear</button>
+            <button onClick={guardar} disabled={!fechaCierre} className={`flex-1 p-3 text-white rounded-xl disabled:opacity-50 ${darkMode ? 'bg-gray-600' : 'bg-indigo-700'}`}>Crear</button>
           </div>
         </div>
       </div>
@@ -1133,6 +1278,45 @@ const FinanzasApp = () => {
     );
   };
 
+  // Modal Editar Consumo
+  const ModalEditarConsumo = () => {
+    const [descripcion, setDescripcion] = useState(movimientoEditar?.descripcion || '');
+    const [monto, setMonto] = useState(movimientoEditar?.monto?.toString() || '');
+    const [categoria, setCategoria] = useState(movimientoEditar?.categoria || 'otros');
+    const [fecha, setFecha] = useState(movimientoEditar?.fecha || '');
+
+    if (!movimientoEditar) return null;
+
+    const guardar = async () => {
+      await actualizarMovimiento(movimientoEditar.id, { descripcion, monto: parseFloat(monto), categoria, fecha });
+      setModal(null);
+      setMovimientoEditar(null);
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className={`rounded-2xl w-full max-w-lg ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+          <div className={`p-4 border-b flex justify-between items-center ${theme.border}`}>
+            <h3 className={`font-bold ${theme.text}`}>Editar Consumo</h3>
+            <button onClick={() => { setModal(null); setMovimientoEditar(null); }}><X className={`w-5 h-5 ${theme.text}`} /></button>
+          </div>
+          <div className="p-4 space-y-4">
+            <input type="text" value={descripcion} onChange={e => setDescripcion(e.target.value)} placeholder="Descripción" className={`w-full p-3 border rounded-xl ${theme.input}`} />
+            <input type="number" value={monto} onChange={e => setMonto(e.target.value)} placeholder="Monto" className={`w-full p-3 border rounded-xl ${theme.input}`} />
+            <select value={categoria} onChange={e => setCategoria(e.target.value)} className={`w-full p-3 border rounded-xl ${theme.input}`}>
+              {CATEGORIAS.map(c => <option key={c.id} value={c.id}>{c.icon} {c.nombre}</option>)}
+            </select>
+            <DatePicker label="Fecha" value={fecha} onChange={setFecha} darkMode={darkMode} theme={theme} />
+          </div>
+          <div className={`p-4 border-t flex gap-3 ${theme.border}`}>
+            <button onClick={() => { setModal(null); setMovimientoEditar(null); }} className={`flex-1 p-3 border rounded-xl ${theme.border} ${theme.text}`}>Cancelar</button>
+            <button onClick={guardar} className="flex-1 p-3 bg-blue-600 text-white rounded-xl">Guardar</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Tabs
   const tabs = [
     { id: 'dashboard', label: 'Inicio', icon: <Home className="w-5 h-5" /> },
@@ -1144,11 +1328,9 @@ const FinanzasApp = () => {
       <header className={`border-b sticky top-0 z-40 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-slate-200'}`}>
         <div className="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${darkMode ? 'bg-gray-700' : 'bg-slate-800'}`}>
-              <PiggyBank className="w-6 h-6 text-white" />
-            </div>
+            <MonityLogo size={36} />
             <div>
-              <h1 className={`font-bold ${theme.text}`}>MisFinanzas</h1>
+              <h1 className={`font-bold ${theme.text}`}>Monity</h1>
               <p className={`text-xs ${theme.textMuted}`}>{user.email}</p>
             </div>
           </div>
@@ -1190,8 +1372,54 @@ const FinanzasApp = () => {
       {modal === 'cuenta-contable' && <ModalCuentaContable />}
       {modal === 'consumo' && <ModalConsumo />}
       {modal === 'pago' && <ModalPago />}
+      {modal === 'editar-consumo' && <ModalEditarConsumo />}
+      
+      {/* Popup de alertas */}
+      {alertaActiva && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className={`rounded-2xl w-full max-w-sm p-6 text-center ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+            <AlertTriangle className="w-16 h-16 mx-auto text-amber-500 mb-4" />
+            <h3 className={`text-lg font-bold mb-2 ${theme.text}`}>¡Atención!</h3>
+            <p className={`mb-6 ${theme.textMuted}`}>{alertaActiva.mensaje}</p>
+            <button onClick={() => setAlertaActiva(null)} className="w-full p-3 bg-amber-500 text-white rounded-xl font-medium">
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
-export default FinanzasApp;
+// Modal para editar consumo
+const ModalEditarConsumoComponent = ({ movimiento, onClose, onSave, darkMode, theme, CATEGORIAS }) => {
+  const [descripcion, setDescripcion] = useState(movimiento?.descripcion || '');
+  const [monto, setMonto] = useState(movimiento?.monto?.toString() || '');
+  const [categoria, setCategoria] = useState(movimiento?.categoria || 'otros');
+
+  if (!movimiento) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className={`rounded-2xl w-full max-w-lg ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+        <div className={`p-4 border-b flex justify-between items-center ${theme.border}`}>
+          <h3 className={`font-bold ${theme.text}`}>Editar Consumo</h3>
+          <button onClick={onClose}><X className={`w-5 h-5 ${theme.text}`} /></button>
+        </div>
+        <div className="p-4 space-y-4">
+          <input type="text" value={descripcion} onChange={e => setDescripcion(e.target.value)} placeholder="Descripción" className={`w-full p-3 border rounded-xl ${theme.input}`} />
+          <input type="number" value={monto} onChange={e => setMonto(e.target.value)} placeholder="Monto" className={`w-full p-3 border rounded-xl ${theme.input}`} />
+          <select value={categoria} onChange={e => setCategoria(e.target.value)} className={`w-full p-3 border rounded-xl ${theme.input}`}>
+            {CATEGORIAS.map(c => <option key={c.id} value={c.id}>{c.icon} {c.nombre}</option>)}
+          </select>
+        </div>
+        <div className={`p-4 border-t flex gap-3 ${theme.border}`}>
+          <button onClick={onClose} className={`flex-1 p-3 border rounded-xl ${theme.border} ${theme.text}`}>Cancelar</button>
+          <button onClick={() => onSave({ descripcion, monto: parseFloat(monto), categoria })} className="flex-1 p-3 bg-blue-600 text-white rounded-xl">Guardar</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default MonityApp;

@@ -1108,11 +1108,11 @@ const FinanzasApp = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm text-slate-600 mb-1">Día de cierre</label>
-                  <input type="text" value={diaCierreLabel || diaCierre} onChange={e => { setDiaCierreLabel(e.target.value); setDiaCierre(e.target.value.split('/')[0]); }} placeholder="DD/MM (ej: 15/05)" className="w-full p-3 border rounded-xl" />
+                  <input type="text" value={diaCierreLabel || diaCierre} onChange={e => { setDiaCierreLabel(e.target.value); setDiaCierre(e.target.value.split('/')[0]); }} placeholder="DD/MM/YYYY (ej: 15/05/2025)" className="w-full p-3 border rounded-xl" />
                 </div>
                 <div>
                   <label className="block text-sm text-slate-600 mb-1">Día de vencimiento</label>
-                  <input type="text" value={diaVencimientoLabel || diaVencimiento} onChange={e => { setDiaVencimientoLabel(e.target.value); setDiaVencimiento(e.target.value.split('/')[0]); }} placeholder="DD/MM (ej: 05/06)" className="w-full p-3 border rounded-xl" />
+                  <input type="text" value={diaVencimientoLabel || diaVencimiento} onChange={e => { setDiaVencimientoLabel(e.target.value); setDiaVencimiento(e.target.value.split('/')[0]); }} placeholder="DD/MM/YYYY (ej: 05/06/2025)" className="w-full p-3 border rounded-xl" />
                 </div>
               </div>
             </div>

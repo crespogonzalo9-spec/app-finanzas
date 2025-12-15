@@ -74,7 +74,6 @@ const TIPOS_CUENTA = { DEBITO: 'debito', CREDITO: 'credito' };
 
 // === UTILIDADES ===
 const formatCurrency = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(n || 0);
-const formatDate = (d) => d ? new Date(d + 'T12:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: 'short' }) : '-';
 
 const calcularPeriodoActual = (diaCierre) => {
   const hoy = new Date();
@@ -100,7 +99,8 @@ const formatDayMonth = (isoDate) => {
   const d = new Date(isoDate);
   const dd = String(d.getDate()).padStart(2, '0');
   const mm = String(d.getMonth() + 1).padStart(2, '0');
-  return `${dd}/${mm}`;
+  const yyyy = d.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
 };
 
 const detectarCategoria = (desc) => {
@@ -702,8 +702,8 @@ const FinanzasApp = () => {
                   {periodo && (
                     <div className="bg-slate-50 rounded-lg p-2 text-xs flex justify-between items-center">
                       <div className="text-sm">
-                        <div><strong>Cierre:</strong> {c.diaCierreLabel ? c.diaCierreLabel : formatDayMonth(periodo.fechaCierre)}</div>
-                        <div><strong>Venc:</strong> {c.diaVencimientoLabel ? c.diaVencimientoLabel : (periodo.fechaVencimiento ? formatDayMonth(periodo.fechaVencimiento) : 'Pendiente')}</div>
+                        <div><strong>Cierre:</strong> {c.diaCierreDate ? formatDayMonth(c.diaCierreDate) : (c.diaCierreLabel ? c.diaCierreLabel : formatDayMonth(periodo.fechaCierre))}</div>
+                        <div><strong>Venc:</strong> {c.diaVencimientoDate ? formatDayMonth(c.diaVencimientoDate) : (c.diaVencimientoLabel ? c.diaVencimientoLabel : (periodo.fechaVencimiento ? formatDayMonth(periodo.fechaVencimiento) : 'Pendiente'))}</div>
                       </div>
                       {diasCierre !== null && diasCierre >= 0 && (
                         <span className={diasCierre <= 3 ? 'text-red-600 font-semibold' : 'text-slate-600'}>
@@ -1042,6 +1042,8 @@ const FinanzasApp = () => {
     const [diaVencimiento, setDiaVencimiento] = useState('');
     const [diaCierreLabel, setDiaCierreLabel] = useState('');
     const [diaVencimientoLabel, setDiaVencimientoLabel] = useState('');
+    const [diaCierreDate, setDiaCierreDate] = useState('');
+    const [diaVencimientoDate, setDiaVencimientoDate] = useState('');
 
     const guardar = async () => {
       const entidadNombre = tipoEntidad === 'billetera' 
@@ -1070,7 +1072,9 @@ const FinanzasApp = () => {
         tipoTarjeta: TIPOS_TARJETA.find(t => t.id === tipoTarjeta)?.nombre,
         nombre: nombre || `${tipoTarjeta} ${entidadNombre}`,
         diaCierre: cierre.day, diaVencimiento: venc.day,
-        diaCierreLabel: cierre.label, diaVencimientoLabel: venc.label
+        diaCierreLabel: cierre.label, diaVencimientoLabel: venc.label,
+        diaCierreDate: diaCierreDate || null,
+        diaVencimientoDate: diaVencimientoDate || null,
       });
       setModal(null);
     };
@@ -1108,11 +1112,11 @@ const FinanzasApp = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm text-slate-600 mb-1">Día de cierre</label>
-                  <input type="text" value={diaCierreLabel || diaCierre} onChange={e => { setDiaCierreLabel(e.target.value); setDiaCierre(e.target.value.split('/')[0]); }} placeholder="DD/MM/YYYY (ej: 15/05/2025)" className="w-full p-3 border rounded-xl" />
+                  <input type="date" value={diaCierreDate} onChange={e => { setDiaCierreDate(e.target.value); const d = e.target.value ? new Date(e.target.value) : null; if (d) { setDiaCierreLabel(`${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`); setDiaCierre(d.getDate()); } else { setDiaCierreLabel(''); setDiaCierre(''); } }} min="2000-01-01" max="2100-12-31" className="w-full p-3 border rounded-xl" />
                 </div>
                 <div>
                   <label className="block text-sm text-slate-600 mb-1">Día de vencimiento</label>
-                  <input type="text" value={diaVencimientoLabel || diaVencimiento} onChange={e => { setDiaVencimientoLabel(e.target.value); setDiaVencimiento(e.target.value.split('/')[0]); }} placeholder="DD/MM/YYYY (ej: 05/06/2025)" className="w-full p-3 border rounded-xl" />
+                  <input type="date" value={diaVencimientoDate} onChange={e => { setDiaVencimientoDate(e.target.value); const d = e.target.value ? new Date(e.target.value) : null; if (d) { setDiaVencimientoLabel(`${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`); setDiaVencimiento(d.getDate()); } else { setDiaVencimientoLabel(''); setDiaVencimiento(''); } }} min="2000-01-01" max="2100-12-31" className="w-full p-3 border rounded-xl" />
                 </div>
               </div>
             </div>

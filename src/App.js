@@ -37,33 +37,77 @@ const googleProvider = new GoogleAuthProvider();
 
 // === BASES DE DATOS ===
 const BANCOS_ARGENTINA = [
-  { id: 'galicia', nombre: 'Banco Galicia', logo: '🏦' },
-  { id: 'santander', nombre: 'Banco Santander', logo: '🔴' },
-  { id: 'bbva', nombre: 'BBVA Argentina', logo: '🔵' },
-  { id: 'macro', nombre: 'Banco Macro', logo: '💙' },
-  { id: 'nacion', nombre: 'Banco de la Nación Argentina', logo: '🇦🇷' },
-  { id: 'provincia', nombre: 'Banco Provincia', logo: '🟢' },
-  { id: 'ciudad', nombre: 'Banco Ciudad', logo: '🏙️' },
-  { id: 'hipotecario', nombre: 'Banco Hipotecario', logo: '🏠' },
-  { id: 'icbc', nombre: 'ICBC Argentina', logo: '🔴' },
-  { id: 'hsbc', nombre: 'HSBC Argentina', logo: '🔺' },
-  { id: 'patagonia', nombre: 'Banco Patagonia', logo: '🏔️' },
-  { id: 'supervielle', nombre: 'Banco Supervielle', logo: '💚' },
-  { id: 'brubank', nombre: 'Brubank', logo: '💜' },
-  { id: 'reba', nombre: 'Rebanking', logo: '🔄' },
-  { id: 'del_sol', nombre: 'Banco del Sol', logo: '☀️' },
+  { id: 'galicia', nombre: 'Banco Galicia', logo: 'https://www.bancogalicia.com/banca/img/favicon/favicon-32x32.png', color: '#FF6B00' },
+  { id: 'santander', nombre: 'Banco Santander', logo: 'https://www.santander.com.ar/banco/online/favicon.ico', color: '#EC0000' },
+  { id: 'bbva', nombre: 'BBVA Argentina', logo: 'https://www.bbva.com.ar/content/dam/public-web/global/images/favicon/favicon-32x32.png', color: '#004481' },
+  { id: 'macro', nombre: 'Banco Macro', logo: 'https://www.macro.com.ar/assets/images/favicon-32x32.png', color: '#003399' },
+  { id: 'nacion', nombre: 'Banco Nación', logo: 'https://www.bna.com.ar/favicon.ico', color: '#003366' },
+  { id: 'provincia', nombre: 'Banco Provincia', logo: 'https://www.bancoprovincia.com.ar/Content/img/favicon-32x32.png', color: '#006633' },
+  { id: 'ciudad', nombre: 'Banco Ciudad', logo: 'https://www.bancociudad.com.ar/institucional/favicon.ico', color: '#003366' },
+  { id: 'hipotecario', nombre: 'Banco Hipotecario', logo: 'https://www.hipotecario.com.ar/assets/favicon/favicon-32x32.png', color: '#FF6600' },
+  { id: 'icbc', nombre: 'ICBC Argentina', logo: 'https://www.icbc.com.ar/favicon.ico', color: '#C8102E' },
+  { id: 'hsbc', nombre: 'HSBC Argentina', logo: 'https://www.hsbc.com.ar/etc.clientlibs/dpws/clientlibs/clientlib-base/resources/favicons/favicon-32x32.png', color: '#DB0011' },
+  { id: 'patagonia', nombre: 'Banco Patagonia', logo: 'https://www.bancopatagonia.com.ar/favicon.ico', color: '#00529B' },
+  { id: 'supervielle', nombre: 'Banco Supervielle', logo: 'https://www.supervielle.com.ar/favicon.ico', color: '#00A551' },
+  { id: 'brubank', nombre: 'Brubank', logo: 'https://www.brubank.com/favicon-32x32.png', color: '#6B21A8' },
+  { id: 'reba', nombre: 'Rebanking', logo: 'https://www.rebanking.com.ar/favicon.ico', color: '#00C389' },
+  { id: 'del_sol', nombre: 'Banco del Sol', logo: 'https://www.bancosol.com.ar/favicon.ico', color: '#FFB800' },
 ];
 
 const BILLETERAS_VIRTUALES = [
-  { id: 'mercadopago', nombre: 'Mercado Pago', logo: '💙' },
-  { id: 'uala', nombre: 'Ualá', logo: '💜' },
-  { id: 'naranja_x', nombre: 'Naranja X', logo: '🟠' },
-  { id: 'personal_pay', nombre: 'Personal Pay', logo: '🔵' },
-  { id: 'modo', nombre: 'MODO', logo: '🟢' },
-  { id: 'cuenta_dni', nombre: 'Cuenta DNI', logo: '🪪' },
-  { id: 'prex', nombre: 'Prex', logo: '💚' },
-  { id: 'lemon', nombre: 'Lemon Cash', logo: '🍋' },
+  { id: 'mercadopago', nombre: 'Mercado Pago', logo: 'https://http2.mlstatic.com/frontend-assets/mp-web-navigation/ui-navigation/6.6.92/mercadopago/favicon-32x32.png', color: '#00BCFF' },
+  { id: 'uala', nombre: 'Ualá', logo: 'https://www.uala.com.ar/favicon-32x32.png', color: '#FF3366' },
+  { id: 'naranja_x', nombre: 'Naranja X', logo: 'https://www.naranjax.com/favicon-32x32.png', color: '#FF6600' },
+  { id: 'personal_pay', nombre: 'Personal Pay', logo: 'https://www.personalpay.com.ar/favicon.ico', color: '#0066CC' },
+  { id: 'modo', nombre: 'MODO', logo: 'https://www.modo.com.ar/favicon-32x32.png', color: '#00D4AA' },
+  { id: 'cuenta_dni', nombre: 'Cuenta DNI', logo: 'https://www.bancoprovincia.com.ar/Content/img/favicon-32x32.png', color: '#006633' },
+  { id: 'prex', nombre: 'Prex', logo: 'https://www.prexcard.com/favicon.ico', color: '#00C853' },
+  { id: 'lemon', nombre: 'Lemon Cash', logo: 'https://www.lemon.me/favicon-32x32.png', color: '#FFE500' },
+  { id: 'belo', nombre: 'Belo', logo: 'https://www.belo.app/favicon-32x32.png', color: '#5865F2' },
+  { id: 'claro_pay', nombre: 'Claro Pay', logo: 'https://www.claropay.com.ar/favicon.ico', color: '#DA291C' },
 ];
+
+// Componente para mostrar logo de entidad
+const EntidadLogo = ({ entidad, size = 24 }) => {
+  const todas = [...BANCOS_ARGENTINA, ...BILLETERAS_VIRTUALES];
+  const found = todas.find(e => e.nombre === entidad || e.id === entidad);
+  
+  if (!found) return <span className="text-lg">🏦</span>;
+  
+  return (
+    <img 
+      src={found.logo} 
+      alt={found.nombre}
+      className="rounded"
+      style={{ width: size, height: size, objectFit: 'contain' }}
+      onError={(e) => {
+        e.target.style.display = 'none';
+        e.target.nextSibling.style.display = 'flex';
+      }}
+    />
+  );
+};
+
+// Fallback con iniciales
+const EntidadFallback = ({ entidad, size = 24 }) => {
+  const todas = [...BANCOS_ARGENTINA, ...BILLETERAS_VIRTUALES];
+  const found = todas.find(e => e.nombre === entidad || e.id === entidad);
+  const initials = entidad ? entidad.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase() : '??';
+  
+  return (
+    <div 
+      className="rounded flex items-center justify-center text-white font-bold"
+      style={{ 
+        width: size, 
+        height: size, 
+        backgroundColor: found?.color || '#6366f1',
+        fontSize: size * 0.4
+      }}
+    >
+      {initials}
+    </div>
+  );
+};
 
 const TIPOS_CUENTA_CONTABLE = [
   { id: 'tarjeta_credito', nombre: 'Tarjeta de Crédito', icon: '💳' },
@@ -727,11 +771,22 @@ const MonityApp = () => {
                   onClick={() => { setCuentaActiva(c); setTab('detalle'); }}
                 >
                   <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <p className={`font-semibold ${theme.text}`}>{c.nombre}</p>
-                      <p className={`text-sm ${theme.textMuted}`}>
-                        {TIPOS_CUENTA_CONTABLE.find(t => t.id === c.tipoCuenta)?.nombre}
-                      </p>
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <img 
+                          src={[...BANCOS_ARGENTINA, ...BILLETERAS_VIRTUALES].find(e => e.nombre === c.entidad)?.logo}
+                          alt={c.entidad}
+                          className="w-10 h-10 rounded-lg object-contain bg-white p-1"
+                          onError={(e) => { e.target.style.display = 'none'; }}
+                        />
+                        <EntidadFallback entidad={c.entidad} size={40} />
+                      </div>
+                      <div>
+                        <p className={`font-semibold ${theme.text}`}>{c.nombre}</p>
+                        <p className={`text-sm ${theme.textMuted}`}>
+                          {TIPOS_CUENTA_CONTABLE.find(t => t.id === c.tipoCuenta)?.nombre}
+                        </p>
+                      </div>
                     </div>
                     <p className={`font-bold ${saldo > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
                       {formatCurrency(saldo)}
@@ -782,6 +837,15 @@ const MonityApp = () => {
           <button onClick={() => { setCuentaActiva(null); setTab('dashboard'); }} className={`p-2 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
             <ChevronRight className={`w-5 h-5 rotate-180 ${theme.text}`} />
           </button>
+          <div className="relative flex-shrink-0">
+            <img 
+              src={[...BANCOS_ARGENTINA, ...BILLETERAS_VIRTUALES].find(e => e.nombre === cuentaActiva.entidad)?.logo}
+              alt={cuentaActiva.entidad}
+              className="w-12 h-12 rounded-xl object-contain bg-white p-1 shadow"
+              onError={(e) => { e.target.style.display = 'none'; }}
+            />
+            <EntidadFallback entidad={cuentaActiva.entidad} size={48} />
+          </div>
           <div className="flex-1">
             <h2 className={`text-xl font-bold ${theme.text}`}>{cuentaActiva.nombre}</h2>
             <p className={theme.textMuted}>{TIPOS_CUENTA_CONTABLE.find(t => t.id === cuentaActiva.tipoCuenta)?.nombre}</p>

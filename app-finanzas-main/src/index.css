@@ -1,0 +1,232 @@
+/* Variables y tema oscuro */
+:root {
+  --bg: #ffffff;
+  --text: #0b0b0b;
+  --card: #f7f7f7;
+  --accent: #0a84ff;
+  --muted: #6b7280;
+  --card-border: #eef2f7;
+  --card-shadow: 0 2px 6px rgba(2,6,23,0.06);
+}
+
+.dark {
+  --bg: #0b0b0f;
+  --text: #e6e6e6;
+  --card: #121217;
+  --accent: #58a6ff;
+  --muted: #9ca3af;
+  --card-border: rgba(255,255,255,0.04);
+  --card-shadow: 0 2px 8px rgba(2,6,23,0.36);
+}
+
+.dark * { color-scheme: dark; }
+
+/* More specific selectors to ensure Tailwind utility classes are overridden in all environments
+   Use attribute selector and html[data-theme="dark"] to increase selector specificity. */
+html[data-theme="dark"] .bg-white,
+html[data-theme="dark"] .bg-slate-50,
+html[data-theme="dark"] .bg-slate-100,
+html[data-theme="dark"] .app-card,
+html[data-theme="dark"] .card-border,
+html[data-theme="dark"] .bg-gradient-to-br,
+html[data-theme="dark"] .min-h-screen,
+html[data-theme="dark"] .bg-emerald-600,
+html[data-theme="dark"] .bg-rose-600,
+html[data-theme="dark"] .bg-amber-600,
+html[data-theme="dark"] .bg-slate-800 {
+  background: var(--card) !important;
+  color: var(--text) !important;
+  border-color: var(--card-border) !important;
+}
+
+html[data-theme="dark"] body, html[data-theme="dark"] html {
+  background: linear-gradient(180deg, #071026 0%, #03030a 100%) !important;
+}
+
+html[data-theme="dark"] .bg-gradient-to-br {
+  background-image: none !important;
+}
+
+/* Force theme variables onto elements that may use utility classes */
+.dark .text-white { color: var(--text) !important; }
+.dark .text-slate-800 { color: var(--text) !important; }
+.dark .bg-white { background: var(--card) !important; }
+.dark .bg-slate-50 { background: var(--card) !important; }
+.dark .bg-slate-100 { background: var(--card) !important; }
+.dark .border { border-color: var(--card-border) !important; }
+.dark .card-border { border-color: var(--card-border) !important; }
+.dark .app-card { background: var(--card) !important; color: var(--text) !important; box-shadow: var(--card-shadow) !important; }
+.dark .text-muted { color: var(--muted) !important; }
+
+/* Accent color override */
+.dark .text-emerald-600, .dark .bg-emerald-600 { color: #34d399 !important; background-color: #064e3b !important; }
+.dark .text-rose-600, .dark .bg-rose-600 { color: #fb7185 !important; background-color: #7f1d1d !important; }
+
+/* Buttons */
+.dark .bg-slate-800 { background-color: #0b1220 !important; color: var(--text) !important; }
+.dark button { color: var(--text) !important; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  transition: background .2s ease, color .2s ease;
+}
+
+/* Botón de tema en la esquina superior derecha */
+#theme-toggle {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 1000;
+  border: none;
+  background: var(--card);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 9999px;
+  color: var(--text);
+  transition: background .2s ease, box-shadow .15s ease;
+  display: inline-flex;
+  align-items: center;
+}
+#theme-toggle:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+#theme-toggle .switch-track {
+  width: 44px;
+  height: 24px;
+  border-radius: 9999px;
+  background: #e6e6e6;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  transition: background .15s ease;
+}
+#theme-toggle .switch-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+  transform: translateX(0);
+  transition: transform .18s cubic-bezier(.2,.9,.2,1), background .15s ease;
+}
+#theme-toggle.on .switch-track {
+  background: var(--accent);
+}
+#theme-toggle.on .switch-thumb {
+  transform: translateX(20px);
+}
+.dark #theme-toggle .switch-track {
+  background: rgba(255,255,255,0.08);
+}
+.dark #theme-toggle:not(.on) .switch-thumb {
+  background: #e6e6e6;
+}
+
+
+/* Ejemplo de tarjeta */
+.app-card {
+  background: var(--card);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 8px;
+  box-shadow: var(--card-shadow);
+  border: 1px solid var(--card-border);
+}
+
+.text-muted { color: var(--muted); }
+.card-border { border: 1px solid var(--card-border); }
+
+/* Estilos de ejemplo para transacciones */
+.transaction {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* Map common utility classes to theme variables so the toggle affects UI
+   These override selected Tailwind-like utility classes to use CSS vars
+   which are switched by the `.dark` class on the root element. */
+.bg-white { background: var(--card) !important; }
+.bg-slate-50 { background: var(--card) !important; }
+.bg-slate-100 { background: var(--card) !important; }
+.text-slate-800 { color: var(--text) !important; }
+.text-slate-600, .text-slate-500, .text-slate-400 { color: var(--muted) !important; }
+.border { border-color: var(--card-border) !important; }
+
+/* Make alert and subtle backgrounds use the themed card color when dark */
+.bg-rose-50, .bg-amber-50, .bg-blue-50, .bg-emerald-50 { background: var(--card) !important; }
+
+/* Ensure header/nav backgrounds follow theme */
+header, nav, main { background: transparent; }
+
+/* Make dark mode more visually distinct: override large gradients, white text and generic gradient utilities */
+.dark html, .dark body {
+  background: linear-gradient(180deg, #071026 0%, #03030a 100%) !important;
+}
+
+.dark .bg-gradient-to-br {
+  background-image: none !important;
+  background-color: var(--card) !important;
+}
+
+/* Specific colored gradients used in the dashboard */
+.dark .bg-gradient-to-br.from-emerald-500,
+.dark .from-emerald-500 {
+  background-color: #064e3b !important;
+  color: var(--text) !important;
+}
+.dark .bg-gradient-to-br.from-rose-500,
+.dark .from-rose-500 {
+  background-color: #58151c !important;
+  color: var(--text) !important;
+}
+.dark .bg-gradient-to-br.from-amber-500,
+.dark .from-amber-500 {
+  background-color: #78350f !important;
+  color: var(--text) !important;
+}
+.dark .bg-gradient-to-br.from-blue-500,
+.dark .from-blue-500 {
+  background-color: #05204a !important;
+  color: var(--text) !important;
+}
+
+.dark .bg-emerald-600 { background-color: #065f46 !important; }
+.dark .bg-rose-600 { background-color: #7f1d1d !important; }
+.dark .bg-amber-600 { background-color: #92400e !important; }
+.dark .bg-slate-800 { background-color: #0b1220 !important; }
+
+/* ThemeSwitch styles */
+.theme-switch {
+  width: 64px;
+  height: 30px;
+  border-radius: 9999px;
+  padding: 4px;
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  cursor: pointer;
+}
+.theme-switch .switch-inner { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 0 8px; }
+.theme-switch .icon-sun { color: #f59e0b; }
+.theme-switch .icon-moon { color: #94a3b8; }
+.theme-switch.on { background: linear-gradient(90deg, #0f172a, #0b1220); border-color: rgba(255,255,255,0.06); }
+.theme-switch.on .icon-sun { opacity: 0.4; }
+.theme-switch.on .icon-moon { opacity: 1; color: #93c5fd; }
+
+/* Make header switch visually consistent */
+#theme-switch { outline: none; }
+
+/* Convert explicit white text to theme text color when in dark mode to improve contrast */
+.dark .text-white { color: var(--text) !important; }
+
+/* Make header and nav clearly darker */
+.dark header, .dark nav { background: rgba(0,0,0,0.18); }

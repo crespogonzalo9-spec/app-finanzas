@@ -423,16 +423,70 @@ const MonityApp = () => {
     const totalC = movsFilt.reduce((s, m) => s + m.monto, 0);
     const totalP = pagosFilt.reduce((s, p) => s + p.monto, 0);
     const ratio = totalC > 0 ? Math.round((totalP / totalC) * 100) : 0;
-    const porCat = useMemo(() => {
-      const g = {};
-      movsFilt.forEach(m => { g[m.categoria || 'otros'] = (g[m.categoria || 'otros'] || 0) + m.monto; });
-      return Object.entries(g).map(([id, monto]) => ({ ...CATEGORIAS.find(c => c.id === id) || { id, nombre: id, icon: '📦', color: '#78716c' }, monto })).sort((a, b) => b.monto - a.monto);
-    }, [movsFilt]);
+    
+    // Datos para gráfico circular por cuenta
     const porCuenta = useMemo(() => {
       const g = {};
-      movsFilt.forEach(m => { const c = cuentas.find(x => x.id === m.cuentaId); g[c?.nombre || 'Otro'] = (g[c?.nombre || 'Otro'] || 0) + m.monto; });
-      return Object.entries(g).map(([n, m]) => ({ nombre: n, monto: m })).sort((a, b) => b.monto - a.monto);
-    }, [movsFilt, cuentas]);
+      movsFilt.forEach(m => { 
+        const c = cuentas.find(x => x.id === m.cuentaId); 
+        const nombre = c?.nombre || 'Otro';
+        g[nombre] = (g[nombre] || 0) + m.monto; 
+      });
+      const colores = ['#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e', '#f97316', '#eab308'];
+      return Object.entries(g).map(([nombre, monto], i) => ({ 
+        nombre, 
+        monto, 
+        porcentaje: totalC > 0 ? Math.round((monto / totalC) * 100) : 0,
+        color: colores[i % colores.length]
+      })).sort((a, b) => b.monto - a.monto);
+    }, [movsFilt, cuentas, totalC]);
+
+    // Datos para gráfico circular por tipo (cuotas, tarjetas, préstamos)
+    const porTipo = useMemo(() => {
+      const g = {};
+      movsFilt.forEach(m => { 
+        const cuenta = cuentas.find(x => x.id === m.cuentaId);
+        const tipo = cuenta?.tipoCuenta || 'otros';
+        const tipoNombre = TIPOS_CUENTA.find(t => t.id === tipo)?.nombre || 'Otros';
+        g[tipoNombre] = (g[tipoNombre] || 0) + m.monto; 
+      });
+      const colores = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+      return Object.entries(g).map(([nombre, monto], i) => ({ 
+        nombre, 
+        monto,
+        porcentaje: totalC > 0 ? Math.round((monto / totalC) * 100) : 0,
+        color: colores[i % colores.length]
+      })).sort((a, b) => b.monto - a.monto);
+    }, [movsFilt, cuentas, totalC]);
+
+    // Datos para gráfico lineal anual (balance mensual)
+    const balanceAnual = useMemo(() => {
+      const meses = [];
+      const hoy = new Date();
+      for (let i = 11; i >= 0; i--) {
+        const fecha = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
+        const mesStr = fecha.toISOString().slice(0, 7);
+        const mesNombre = fecha.toLocaleDateString('es-AR', { month: 'short' });
+        
+        const gastosM = movimientos.filter(m => m.fecha?.startsWith(mesStr) && !m.esSaldoAnterior).reduce((s, m) => s + m.monto, 0);
+        const pagosM = pagos.filter(p => p.fecha?.startsWith(mesStr)).reduce((s, p) => s + p.monto, 0);
+        
+        // Balance = Ingresos - Gastos (positivo es bueno)
+        const balance = totalIngresos - gastosM;
+        // Ratio de ahorro (qué % de ingresos no gasté)
+        const ratioAhorro = totalIngresos > 0 ? Math.round(((totalIngresos - gastosM) / totalIngresos) * 100) : 0;
+        
+        meses.push({ 
+          mes: mesNombre.charAt(0).toUpperCase() + mesNombre.slice(1), 
+          gastos: gastosM, 
+          ingresos: totalIngresos,
+          balance,
+          ratioAhorro: Math.max(0, Math.min(100, ratioAhorro))
+        });
+      }
+      return meses;
+    }, [movimientos, pagos, totalIngresos]);
+
     const perfil = useMemo(() => {
       if (totalC === 0) return { tipo: 'Sin datos', desc: 'Aún no hay datos', color: 'gray' };
       if (ratio >= 90) return { tipo: 'Excelente pagador', desc: 'Pagás casi todo', color: 'emerald' };
@@ -440,33 +494,168 @@ const MonityApp = () => {
       if (ratio >= 50) return { tipo: 'Regular', desc: 'Podrías mejorar', color: 'amber' };
       return { tipo: 'Acumulador', desc: 'Consumos > pagos', color: 'rose' };
     }, [totalC, ratio]);
+
+    // Componente gráfico circular simple
+    const PieChartSimple = ({ data, size = 160 }) => {
+      if (!data || data.length === 0) return <p className={theme.textMuted}>Sin datos</p>;
+      let currentAngle = 0;
+      const paths = data.map((item, i) => {
+        const angle = (item.porcentaje / 100) * 360;
+        const startAngle = currentAngle;
+        const endAngle = currentAngle + angle;
+        currentAngle = endAngle;
+        
+        const startRad = (startAngle - 90) * Math.PI / 180;
+        const endRad = (endAngle - 90) * Math.PI / 180;
+        const radius = size / 2 - 10;
+        const cx = size / 2;
+        const cy = size / 2;
+        
+        const x1 = cx + radius * Math.cos(startRad);
+        const y1 = cy + radius * Math.sin(startRad);
+        const x2 = cx + radius * Math.cos(endRad);
+        const y2 = cy + radius * Math.sin(endRad);
+        
+        const largeArc = angle > 180 ? 1 : 0;
+        
+        if (angle === 0) return null;
+        if (angle >= 359.9) {
+          return <circle key={i} cx={cx} cy={cy} r={radius} fill={item.color} />;
+        }
+        
+        return (
+          <path
+            key={i}
+            d={`M ${cx} ${cy} L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2} Z`}
+            fill={item.color}
+          />
+        );
+      });
+      
+      return (
+        <div className="flex flex-col items-center">
+          <svg width={size} height={size} className="mb-4">
+            {paths}
+            <circle cx={size/2} cy={size/2} r={size/4} fill={darkMode ? '#1f2937' : '#ffffff'} />
+          </svg>
+          <div className="w-full space-y-1">
+            {data.map((item, i) => (
+              <div key={i} className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+                  <span className={theme.text}>{item.nombre}</span>
+                </div>
+                <span className={`font-medium ${theme.text}`}>{item.porcentaje}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    };
+
+    // Componente gráfico lineal simple
+    const LineChartSimple = ({ data }) => {
+      if (!data || data.length === 0) return <p className={theme.textMuted}>Sin datos</p>;
+      const maxVal = Math.max(...data.map(d => Math.max(d.gastos, d.ingresos)), 1);
+      const width = 300;
+      const height = 150;
+      const padding = 30;
+      
+      const points = data.map((d, i) => ({
+        x: padding + (i / (data.length - 1)) * (width - padding * 2),
+        yGastos: height - padding - ((d.gastos / maxVal) * (height - padding * 2)),
+        yIngresos: height - padding - ((d.ingresos / maxVal) * (height - padding * 2)),
+        yBalance: height - padding - ((d.ratioAhorro / 100) * (height - padding * 2))
+      }));
+      
+      const pathGastos = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.yGastos}`).join(' ');
+      const pathIngresos = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.yIngresos}`).join(' ');
+      const pathBalance = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.yBalance}`).join(' ');
+      
+      return (
+        <div className="w-full overflow-x-auto">
+          <svg viewBox={`0 0 ${width} ${height + 20}`} className="w-full min-w-[300px]">
+            {/* Grid lines */}
+            {[0, 25, 50, 75, 100].map(pct => (
+              <line key={pct} x1={padding} x2={width - padding} y1={height - padding - (pct / 100) * (height - padding * 2)} y2={height - padding - (pct / 100) * (height - padding * 2)} stroke={darkMode ? '#374151' : '#e2e8f0'} strokeWidth="1" />
+            ))}
+            
+            {/* Línea de ingresos (verde) */}
+            <path d={pathIngresos} fill="none" stroke="#10b981" strokeWidth="2" />
+            
+            {/* Línea de gastos (rojo) */}
+            <path d={pathGastos} fill="none" stroke="#ef4444" strokeWidth="2" />
+            
+            {/* Línea de balance/ahorro (azul) */}
+            <path d={pathBalance} fill="none" stroke="#3b82f6" strokeWidth="3" strokeDasharray="5,5" />
+            
+            {/* Puntos */}
+            {points.map((p, i) => (
+              <g key={i}>
+                <circle cx={p.x} cy={p.yGastos} r="3" fill="#ef4444" />
+                <circle cx={p.x} cy={p.yIngresos} r="3" fill="#10b981" />
+              </g>
+            ))}
+            
+            {/* Labels meses */}
+            {data.map((d, i) => (
+              <text key={i} x={points[i].x} y={height + 10} textAnchor="middle" className="text-[8px]" fill={darkMode ? '#9ca3af' : '#64748b'}>{d.mes}</text>
+            ))}
+          </svg>
+          
+          <div className="flex justify-center gap-4 mt-2 text-xs">
+            <div className="flex items-center gap-1"><div className="w-3 h-0.5 bg-emerald-500" /><span className={theme.textMuted}>Ingresos</span></div>
+            <div className="flex items-center gap-1"><div className="w-3 h-0.5 bg-red-500" /><span className={theme.textMuted}>Gastos</span></div>
+            <div className="flex items-center gap-1"><div className="w-3 h-0.5 bg-blue-500" style={{borderStyle: 'dashed'}} /><span className={theme.textMuted}>% Ahorro</span></div>
+          </div>
+        </div>
+      );
+    };
+
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-3"><button onClick={() => setTab('dashboard')} className={`p-2 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}><ChevronRight className={`w-5 h-5 rotate-180 ${theme.text}`} /></button><h2 className={`text-xl font-bold ${theme.text}`}>Estadísticas</h2></div>
-        <div className={`border rounded-xl p-4 ${theme.card}`}><label className={`block text-sm mb-2 ${theme.textMuted}`}>Período</label><div className="grid grid-cols-4 gap-2">{[1,3,6,12].map(m => (<button key={m} onClick={() => setPeriodo(m)} className={`py-2 rounded-lg text-sm font-medium ${periodo === m ? 'bg-indigo-600 text-white' : `${theme.hover} ${theme.text} border ${theme.border}`}`}>{m === 12 ? '1 año' : `${m}m`}</button>))}</div></div>
+        
+        <div className={`border rounded-xl p-4 ${theme.card}`}><label className={`block text-sm mb-2 ${theme.textMuted}`}>Período de análisis</label><div className="grid grid-cols-4 gap-2">{[1,3,6,12].map(m => (<button key={m} onClick={() => setPeriodo(m)} className={`py-2 rounded-lg text-sm font-medium ${periodo === m ? 'bg-indigo-600 text-white' : `${theme.hover} ${theme.text} border ${theme.border}`}`}>{m === 12 ? '1 año' : `${m}m`}</button>))}</div></div>
+        
         <div className="grid grid-cols-2 gap-4">
           <div className={`border rounded-xl p-4 ${theme.card}`}><p className={`text-xs ${theme.textMuted}`}>Consumido</p><p className="text-xl font-bold text-rose-500">{formatCurrency(totalC)}</p></div>
           <div className={`border rounded-xl p-4 ${theme.card}`}><p className={`text-xs ${theme.textMuted}`}>Pagado</p><p className="text-xl font-bold text-emerald-500">{formatCurrency(totalP)}</p></div>
         </div>
+
+        {/* Gráfico Anual: Ingresos vs Gastos */}
+        <div className={`border rounded-xl p-4 ${theme.card}`}>
+          <h3 className={`font-semibold mb-4 flex items-center gap-2 ${theme.text}`}>
+            <Target className="w-5 h-5 text-blue-500" /> Evolución Anual
+          </h3>
+          <p className={`text-xs ${theme.textMuted} mb-4`}>Si la línea azul sube, tu situación mejora (más ahorro)</p>
+          <LineChartSimple data={balanceAnual} />
+        </div>
+        
         <div className={`border rounded-xl p-4 ${theme.card}`}>
           <div className="flex justify-between items-center mb-2"><span className={`font-semibold ${theme.text}`}>Ratio de pago</span><span className={`text-2xl font-bold ${ratio >= 70 ? 'text-emerald-500' : ratio >= 50 ? 'text-amber-500' : 'text-rose-500'}`}>{ratio}%</span></div>
           <div className={`h-3 rounded-full ${darkMode ? 'bg-gray-700' : 'bg-slate-200'}`}><div className={`h-full rounded-full ${ratio >= 70 ? 'bg-emerald-500' : ratio >= 50 ? 'bg-amber-500' : 'bg-rose-500'}`} style={{ width: `${Math.min(ratio, 100)}%` }} /></div>
         </div>
+        
         <div className={`border rounded-xl p-4 ${theme.card}`}><div className="flex items-center gap-3"><Target className={`w-6 h-6 text-${perfil.color}-500`} /><div><p className={`font-bold ${theme.text}`}>{perfil.tipo}</p><p className={`text-sm ${theme.textMuted}`}>{perfil.desc}</p></div></div></div>
+        
         <div className={`border rounded-xl p-4 ${theme.card}`}><p className={`text-sm ${theme.textMuted}`}>Promedio mensual</p><p className={`text-xl font-bold ${theme.text}`}>{formatCurrency(totalC / periodo)}</p></div>
+
+        {/* Gráfico circular por Cuenta */}
         <div className={`border rounded-xl p-4 ${theme.card}`}>
-          <h3 className={`font-semibold mb-4 flex items-center gap-2 ${theme.text}`}><PieChart className="w-5 h-5 text-purple-500" /> Por categoría</h3>
-          {porCat.length === 0 ? <p className={theme.textMuted}>Sin datos</p> : (
-            <div className="space-y-3">{porCat.slice(0, 6).map(c => (
-              <div key={c.id}><div className="flex justify-between items-center mb-1"><span className={`text-sm ${theme.text}`}>{c.icon} {c.nombre}</span><span className={`text-sm font-semibold ${theme.text}`}>{formatCurrency(c.monto)}</span></div><div className={`h-2 rounded-full ${darkMode ? 'bg-gray-700' : 'bg-slate-200'}`}><div className="h-full rounded-full" style={{ width: `${(c.monto / totalC) * 100}%`, backgroundColor: c.color }} /></div></div>
-            ))}</div>
-          )}
+          <h3 className={`font-semibold mb-4 flex items-center gap-2 ${theme.text}`}>
+            <PieChart className="w-5 h-5 text-purple-500" /> Gastos por Cuenta
+          </h3>
+          <PieChartSimple data={porCuenta} />
         </div>
+
+        {/* Gráfico circular por Tipo de Cuenta */}
         <div className={`border rounded-xl p-4 ${theme.card}`}>
-          <h3 className={`font-semibold mb-4 flex items-center gap-2 ${theme.text}`}><CreditCard className="w-5 h-5 text-blue-500" /> Por cuenta</h3>
-          {porCuenta.length === 0 ? <p className={theme.textMuted}>Sin datos</p> : (
-            <div className="space-y-2">{porCuenta.map((c, i) => (<div key={i} className={`flex justify-between items-center p-2 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-slate-50'}`}><span className={theme.text}>{c.nombre}</span><span className={`font-semibold ${theme.text}`}>{formatCurrency(c.monto)}</span></div>))}</div>
-          )}
+          <h3 className={`font-semibold mb-4 flex items-center gap-2 ${theme.text}`}>
+            <CreditCard className="w-5 h-5 text-blue-500" /> Gastos por Tipo
+          </h3>
+          <p className={`text-xs ${theme.textMuted} mb-4`}>Tarjetas, préstamos, cuotas, etc.</p>
+          <PieChartSimple data={porTipo} />
         </div>
       </div>
     );

@@ -344,11 +344,14 @@ const MonityApp = () => {
             const saldo = calcularSaldo(c.id);
             const p = periodos.find(x => x.cuentaId === c.id && x.estado === 'abierto');
             return (
-              <div key={c.id} className={`border rounded-xl p-3 cursor-pointer ${theme.card} ${theme.hover}`} onClick={() => { setCuentaActiva(c); setTab('detalle'); }}>
+              <div key={c.id} className={`border rounded-xl p-3 ${theme.card}`}>
                 <div className="flex items-center gap-3">
-                  <EntidadLogo entidad={c.entidad} size={40} />
-                  <div className="flex-1"><p className={`font-semibold ${theme.text}`}>{c.nombre}</p><p className={`text-xs ${theme.textMuted}`}>{p ? `${formatDateShort(p.fechaInicio)} - ${formatDateShort(p.fechaCierre)}` : 'Sin período'}</p></div>
+                  <div className="cursor-pointer flex items-center gap-3 flex-1" onClick={() => { setCuentaActiva(c); setTab('detalle'); }}>
+                    <EntidadLogo entidad={c.entidad} size={40} />
+                    <div className="flex-1"><p className={`font-semibold ${theme.text}`}>{c.nombre}</p><p className={`text-xs ${theme.textMuted}`}>{p ? `${formatDateShort(p.fechaInicio)} - ${formatDateShort(p.fechaCierre)}` : 'Sin período'}</p></div>
+                  </div>
                   <p className={`font-bold ${saldo > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(saldo)}</p>
+                  <button onClick={(e) => { e.stopPropagation(); if(window.confirm('¿Eliminar esta cuenta y todos sus movimientos?')) eliminarCuenta(c.id); }} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>
                 </div>
               </div>
             );
@@ -372,6 +375,7 @@ const MonityApp = () => {
           <button onClick={() => { setCuentaActiva(null); setTab('dashboard'); }} className={`p-2 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}><ChevronRight className={`w-5 h-5 rotate-180 ${theme.text}`} /></button>
           <EntidadLogo entidad={cuentaActiva.entidad} size={44} />
           <div className="flex-1"><h2 className={`text-lg font-bold ${theme.text}`}>{cuentaActiva.nombre}</h2><p className={`text-sm ${theme.textMuted}`}>{TIPOS_CUENTA.find(t => t.id === cuentaActiva.tipoCuenta)?.nombre}</p></div>
+          <button onClick={() => { if(window.confirm('¿Eliminar esta cuenta y todos sus movimientos?')) { eliminarCuenta(cuentaActiva.id); setCuentaActiva(null); setTab('dashboard'); } }} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-5 h-5" /></button>
         </div>
         {p && (
           <div className={`rounded-xl p-4 ${darkMode ? 'bg-gray-800' : 'bg-indigo-50'}`}>

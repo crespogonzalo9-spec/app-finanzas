@@ -4,6 +4,33 @@ import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signO
 import { getFirestore, doc, setDoc, getDoc, collection, addDoc, getDocs, deleteDoc, updateDoc } from 'firebase/firestore';
 import { Calendar, PlusCircle, Home, ChevronRight, X, DollarSign, RefreshCw, CreditCard, ArrowDownCircle, ArrowUpCircle, LogOut, Sliders, Trash2, Moon, Sun, Minus, Plus, Repeat, Edit3, Bell, Download, BarChart3, Target, PieChart } from 'lucide-react';
 
+// Versión de la app - cambiar este número fuerza actualización del cache
+const APP_VERSION = '1.0.1';
+
+// Auto-actualización: limpiar cache si hay nueva versión
+if (typeof window !== 'undefined') {
+  const storedVersion = localStorage.getItem('monity_version');
+  if (storedVersion !== APP_VERSION) {
+    // Limpiar caches del Service Worker
+    if ('caches' in window) {
+      caches.keys().then(names => {
+        names.forEach(name => caches.delete(name));
+      });
+    }
+    // Desregistrar Service Workers antiguos
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(registrations => {
+        registrations.forEach(registration => registration.unregister());
+      });
+    }
+    localStorage.setItem('monity_version', APP_VERSION);
+    // Recargar solo si no es la primera visita
+    if (storedVersion) {
+      window.location.reload(true);
+    }
+  }
+}
+
 const MonityLogo = ({ size = 40 }) => (
   <svg width={size} height={size} viewBox="0 0 100 100">
     <defs><linearGradient id="monityGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#6366f1" /><stop offset="100%" stopColor="#8b5cf6" /></linearGradient></defs>
@@ -358,18 +385,22 @@ const MonityApp = () => {
       <div>
         <div className="flex justify-between items-center mb-3"><h3 className={`font-semibold flex items-center gap-2 ${theme.text}`}><ArrowUpCircle className="w-5 h-5 text-rose-500" /> Cuentas</h3><button onClick={() => setModal('cuenta')} className="p-2 bg-indigo-600 text-white rounded-lg"><PlusCircle className="w-4 h-4" /></button></div>
         {cuentasContables.length === 0 ? <div className={`border-2 border-dashed rounded-xl p-6 text-center ${theme.border}`}><CreditCard className={`w-8 h-8 mx-auto mb-2 ${theme.textMuted}`} /><p className={theme.textMuted}>Creá tus cuentas</p></div> : (
-          <div className="space-y-2">{cuentasContables.map(c => {
+          <div className="space-y-3">{cuentasContables.map(c => {
             const saldo = calcularSaldo(c.id);
-            const p = periodos.find(x => x.cuentaId === c.id && x.estado === 'abierto');
             return (
-              <div key={c.id} className={`border rounded-xl p-3 ${theme.card}`}>
-                <div className="flex items-center gap-3">
+              <div key={c.id} className={`border rounded-xl p-4 ${theme.card}`}>
+                <div className="flex items-center gap-3 mb-2">
                   <div className="cursor-pointer flex items-center gap-3 flex-1" onClick={() => { setCuentaActiva(c); setTab('detalle'); }}>
                     <EntidadLogo entidad={c.entidad} size={40} />
-                    <div className="flex-1"><p className={`font-semibold ${theme.text}`}>{c.nombre}</p><p className={`text-xs ${theme.textMuted}`}>{p ? `${formatDateShort(p.fechaInicio)} - ${formatDateShort(p.fechaCierre)}` : 'Sin período'}</p></div>
+                    <div className="flex-1"><p className={`font-semibold ${theme.text}`}>{c.nombre}</p><p className={`text-xs ${theme.textMuted}`}>{TIPOS_CUENTA.find(t => t.id === c.tipoCuenta)?.nombre}</p></div>
                   </div>
-                  <p className={`font-bold ${saldo > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(saldo)}</p>
-                  <button onClick={(e) => { e.stopPropagation(); if(window.confirm('¿Eliminar esta cuenta y todos sus movimientos?')) eliminarCuenta(c.id); }} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>
+                  <p className={`font-bold text-lg ${saldo > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(saldo)}</p>
+                  <button onClick={(e) => { e.stopPropagation(); setCuentaEditar(c); setModal('editar-cuenta'); }} className={`p-2 rounded-lg ${theme.hover}`}><Edit3 className="w-4 h-4 text-blue-500" /></button>
+                  <button onClick={(e) => { e.stopPropagation(); if(window.confirm('¿Eliminar esta cuenta y todos sus movimientos?')) eliminarCuenta(c.id); }} className={`p-2 rounded-lg ${theme.hover}`}><Trash2 className="w-4 h-4 text-red-500" /></button>
+                </div>
+                <div className={`grid grid-cols-2 gap-2 text-xs p-2 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-slate-50'}`}>
+                  <div><span className={theme.textMuted}>Cierre: </span><span className={`font-medium ${theme.text}`}>{formatDateShort(c.cierreActual)}</span></div>
+                  <div><span className={theme.textMuted}>Vence: </span><span className={`font-medium ${theme.text}`}>{formatDateShort(c.vencimientoActual)}</span></div>
                 </div>
               </div>
             );

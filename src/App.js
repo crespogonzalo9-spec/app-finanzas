@@ -4,32 +4,7 @@ import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signO
 import { getFirestore, doc, setDoc, getDoc, collection, addDoc, getDocs, deleteDoc, updateDoc } from 'firebase/firestore';
 import { Calendar, PlusCircle, Home, ChevronRight, X, DollarSign, RefreshCw, CreditCard, ArrowDownCircle, ArrowUpCircle, LogOut, Sliders, Trash2, Moon, Sun, Minus, Plus, Repeat, Edit3, Bell, Download, BarChart3, Target, PieChart } from 'lucide-react';
 
-// Versión de la app - cambiar este número fuerza actualización del cache
-const APP_VERSION = '1.0.1';
 
-// Auto-actualización: limpiar cache si hay nueva versión
-if (typeof window !== 'undefined') {
-  const storedVersion = localStorage.getItem('monity_version');
-  if (storedVersion !== APP_VERSION) {
-    // Limpiar caches del Service Worker
-    if ('caches' in window) {
-      caches.keys().then(names => {
-        names.forEach(name => caches.delete(name));
-      });
-    }
-    // Desregistrar Service Workers antiguos
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(registrations => {
-        registrations.forEach(registration => registration.unregister());
-      });
-    }
-    localStorage.setItem('monity_version', APP_VERSION);
-    // Recargar solo si no es la primera visita
-    if (storedVersion) {
-      window.location.reload(true);
-    }
-  }
-}
 
 const MonityLogo = ({ size = 40 }) => (
   <svg width={size} height={size} viewBox="0 0 100 100">

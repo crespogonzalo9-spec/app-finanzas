@@ -10,22 +10,5 @@ root.render(
   </React.StrictMode>
 );
 
-// Desregistrar cualquier Service Worker existente para evitar problemas de cache
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then(registrations => {
-    registrations.forEach(registration => {
-      registration.unregister();
-      console.log('Service Worker desregistrado');
-    });
-  });
-}
-
-// Limpiar caches antiguos
-if ('caches' in window) {
-  caches.keys().then(names => {
-    names.forEach(name => {
-      caches.delete(name);
-      console.log('Cache eliminado:', name);
-    });
-  });
-}
+// Se eliminó la limpieza agresiva de Service Workers y Cache que causaba problemas con el Login.
+// La gestión de caché ahora es manejada por el control de versiones en App.js

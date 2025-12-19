@@ -242,7 +242,25 @@ const MonityApp = () => {
 
   const guardarMovimiento = async (mov) => {
     if (!user) return;
-    if (config.alertaGastoAlto && mov.monto >= config.montoAlertaGasto) setAlertaActiva({ mensaje: `Gasto de ${formatCurrency(mov.monto)} supera tu límite` });
+    
+    // Alerta 1: Gasto individual alto
+    if (config.alertaGastoAlto && mov.monto >= config.montoAlertaGasto) {
+      setAlertaActiva({ mensaje: `Gasto de ${formatCurrency(mov.monto)} supera tu límite de ${formatCurrency(config.montoAlertaGasto)}` });
+    }
+    
+    // Alerta 2: Porcentaje de ingresos gastado
+    if (config.alertaPorcentaje && totalIngresos > 0) {
+      const gastosActuales = movimientos.reduce((s, m) => s + (m.monto || 0), 0);
+      const nuevoTotalGastos = gastosActuales + mov.monto;
+      const porcentajeGastado = (nuevoTotalGastos / totalIngresos) * 100;
+      
+      if (porcentajeGastado >= config.porcentajeAlerta) {
+        setAlertaActiva({ 
+          mensaje: `¡Atención! Has gastado el ${Math.round(porcentajeGastado)}% de tus ingresos (${formatCurrency(nuevoTotalGastos)} de ${formatCurrency(totalIngresos)})` 
+        });
+      }
+    }
+    
     const ref = await addDoc(collection(db, 'users', user.uid, 'movimientos'), mov);
     setMovimientos([...movimientos, { ...mov, id: ref.id }]);
     return ref.id;
@@ -557,15 +575,31 @@ const MonityApp = () => {
     const LineChartSimple = ({ data }) => {
       if (!data || data.length === 0) return <p className={theme.textMuted}>Sin datos</p>;
       const maxVal = Math.max(...data.map(d => Math.max(d.gastos, d.ingresos)), 1);
-      const width = 300;
-      const height = 150;
-      const padding = 30;
+      const width = 320;
+      const height = 180;
+      const paddingLeft = 65;
+      const paddingRight = 20;
+      const paddingTop = 20;
+      const paddingBottom = 40;
+      const chartWidth = width - paddingLeft - paddingRight;
+      const chartHeight = height - paddingTop - paddingBottom;
+      
+      // Formatear valores para el eje Y
+      const formatAxisValue = (val) => {
+        if (val >= 1000000) return `${(val / 1000000).toFixed(1)}M`;
+        if (val >= 1000) return `${(val / 1000).toFixed(0)}K`;
+        return val.toString();
+      };
+      
+      // Valores del eje Y (5 líneas)
+      const yAxisValues = [0, 0.25, 0.5, 0.75, 1].map(pct => Math.round(maxVal * pct));
       
       const points = data.map((d, i) => ({
-        x: padding + (i / (data.length - 1)) * (width - padding * 2),
-        yGastos: height - padding - ((d.gastos / maxVal) * (height - padding * 2)),
-        yIngresos: height - padding - ((d.ingresos / maxVal) * (height - padding * 2)),
-        yBalance: height - padding - ((d.ratioAhorro / 100) * (height - padding * 2))
+        x: paddingLeft + (i / Math.max(data.length - 1, 1)) * chartWidth,
+        yGastos: paddingTop + chartHeight - ((d.gastos / maxVal) * chartHeight),
+        yIngresos: paddingTop + chartHeight - ((d.ingresos / maxVal) * chartHeight),
+        yBalance: paddingTop + chartHeight - ((d.ratioAhorro / 100) * chartHeight),
+        data: d
       }));
       
       const pathGastos = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.yGastos}`).join(' ');
@@ -574,40 +608,86 @@ const MonityApp = () => {
       
       return (
         <div className="w-full overflow-x-auto">
-          <svg viewBox={`0 0 ${width} ${height + 20}`} className="w-full min-w-[300px]">
-            {/* Grid lines */}
-            {[0, 25, 50, 75, 100].map(pct => (
-              <line key={pct} x1={padding} x2={width - padding} y1={height - padding - (pct / 100) * (height - padding * 2)} y2={height - padding - (pct / 100) * (height - padding * 2)} stroke={darkMode ? '#374151' : '#e2e8f0'} strokeWidth="1" />
-            ))}
+          <svg viewBox={`0 0 ${width} ${height}`} className="w-full min-w-[320px]">
+            {/* Eje Y - líneas horizontales y valores */}
+            {yAxisValues.map((val, i) => {
+              const y = paddingTop + chartHeight - (i * chartHeight / 4);
+              return (
+                <g key={i}>
+                  <line x1={paddingLeft} x2={width - paddingRight} y1={y} y2={y} stroke={darkMode ? '#374151' : '#e2e8f0'} strokeWidth="1" />
+                  <text x={paddingLeft - 8} y={y + 4} textAnchor="end" fontSize="9" fill={darkMode ? '#9ca3af' : '#64748b'}>{formatAxisValue(val)}</text>
+                </g>
+              );
+            })}
+            
+            {/* Eje Y derecho - porcentaje de ahorro */}
+            {[0, 25, 50, 75, 100].map((pct, i) => {
+              const y = paddingTop + chartHeight - (pct / 100) * chartHeight;
+              return (
+                <text key={`pct-${i}`} x={width - paddingRight + 5} y={y + 4} textAnchor="start" fontSize="8" fill="#3b82f6">{pct}%</text>
+              );
+            })}
+            
+            {/* Área bajo la línea de gastos */}
+            <path d={`${pathGastos} L ${points[points.length-1].x} ${paddingTop + chartHeight} L ${points[0].x} ${paddingTop + chartHeight} Z`} fill="rgba(239, 68, 68, 0.1)" />
             
             {/* Línea de ingresos (verde) */}
-            <path d={pathIngresos} fill="none" stroke="#10b981" strokeWidth="2" />
+            <path d={pathIngresos} fill="none" stroke="#10b981" strokeWidth="2.5" />
             
             {/* Línea de gastos (rojo) */}
-            <path d={pathGastos} fill="none" stroke="#ef4444" strokeWidth="2" />
+            <path d={pathGastos} fill="none" stroke="#ef4444" strokeWidth="2.5" />
             
-            {/* Línea de balance/ahorro (azul) */}
-            <path d={pathBalance} fill="none" stroke="#3b82f6" strokeWidth="3" strokeDasharray="5,5" />
+            {/* Línea de balance/ahorro (azul punteada) */}
+            <path d={pathBalance} fill="none" stroke="#3b82f6" strokeWidth="2" strokeDasharray="6,3" />
             
-            {/* Puntos */}
+            {/* Puntos con valores */}
             {points.map((p, i) => (
               <g key={i}>
-                <circle cx={p.x} cy={p.yGastos} r="3" fill="#ef4444" />
-                <circle cx={p.x} cy={p.yIngresos} r="3" fill="#10b981" />
+                <circle cx={p.x} cy={p.yGastos} r="4" fill="#ef4444" stroke="white" strokeWidth="1" />
+                <circle cx={p.x} cy={p.yIngresos} r="4" fill="#10b981" stroke="white" strokeWidth="1" />
+                <circle cx={p.x} cy={p.yBalance} r="3" fill="#3b82f6" stroke="white" strokeWidth="1" />
               </g>
             ))}
             
-            {/* Labels meses */}
+            {/* Labels meses en eje X */}
             {data.map((d, i) => (
-              <text key={i} x={points[i].x} y={height + 10} textAnchor="middle" className="text-[8px]" fill={darkMode ? '#9ca3af' : '#64748b'}>{d.mes}</text>
+              <text key={i} x={points[i].x} y={height - 8} textAnchor="middle" fontSize="9" fill={darkMode ? '#9ca3af' : '#64748b'}>{d.mes}</text>
             ))}
+            
+            {/* Título eje Y izquierdo */}
+            <text x={12} y={height / 2} textAnchor="middle" fontSize="8" fill={darkMode ? '#9ca3af' : '#64748b'} transform={`rotate(-90, 12, ${height / 2})`}>Monto ($)</text>
+            
+            {/* Título eje Y derecho */}
+            <text x={width - 5} y={height / 2} textAnchor="middle" fontSize="8" fill="#3b82f6" transform={`rotate(90, ${width - 5}, ${height / 2})`}>% Ahorro</text>
           </svg>
           
-          <div className="flex justify-center gap-4 mt-2 text-xs">
-            <div className="flex items-center gap-1"><div className="w-3 h-0.5 bg-emerald-500" /><span className={theme.textMuted}>Ingresos</span></div>
-            <div className="flex items-center gap-1"><div className="w-3 h-0.5 bg-red-500" /><span className={theme.textMuted}>Gastos</span></div>
-            <div className="flex items-center gap-1"><div className="w-3 h-0.5 bg-blue-500" style={{borderStyle: 'dashed'}} /><span className={theme.textMuted}>% Ahorro</span></div>
+          {/* Leyenda */}
+          <div className="flex flex-wrap justify-center gap-4 mt-3 text-xs">
+            <div className="flex items-center gap-1.5">
+              <div className="w-4 h-1 rounded bg-emerald-500" />
+              <span className={theme.textMuted}>Ingresos</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-4 h-1 rounded bg-red-500" />
+              <span className={theme.textMuted}>Gastos</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-4 h-0.5 bg-blue-500" style={{borderBottom: '2px dashed #3b82f6'}} />
+              <span className={theme.textMuted}>% Ahorro</span>
+            </div>
           </div>
+          
+          {/* Resumen del último mes */}
+          {data.length > 0 && (
+            <div className={`mt-4 p-3 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-slate-50'}`}>
+              <p className={`text-xs font-medium mb-2 ${theme.text}`}>Último mes ({data[data.length-1].mes}):</p>
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                <div><span className={theme.textMuted}>Ingresos: </span><span className="text-emerald-500 font-medium">{formatCurrency(data[data.length-1].ingresos)}</span></div>
+                <div><span className={theme.textMuted}>Gastos: </span><span className="text-red-500 font-medium">{formatCurrency(data[data.length-1].gastos)}</span></div>
+                <div><span className={theme.textMuted}>Ahorro: </span><span className="text-blue-500 font-medium">{data[data.length-1].ratioAhorro}%</span></div>
+              </div>
+            </div>
+          )}
         </div>
       );
     };
@@ -669,10 +749,45 @@ const MonityApp = () => {
       </div>
       <div className={`border rounded-xl p-4 space-y-4 ${theme.card}`}>
         <h3 className={`font-semibold flex items-center gap-2 ${theme.text}`}><Bell className="w-5 h-5 text-amber-500" /> Alertas</h3>
-        <div className="flex items-center justify-between"><span className={theme.text}>Gasto alto</span><button onClick={() => guardarConfig({ ...config, alertaGastoAlto: !config.alertaGastoAlto })} className={`w-10 h-5 rounded-full ${config.alertaGastoAlto ? 'bg-amber-500' : 'bg-slate-300'}`}><div className={`w-4 h-4 bg-white rounded-full shadow transform ${config.alertaGastoAlto ? 'translate-x-5' : 'translate-x-0.5'}`} /></button></div>
-        {config.alertaGastoAlto && <input type="number" value={config.montoAlertaGasto} onChange={e => guardarConfig({ ...config, montoAlertaGasto: parseInt(e.target.value) || 0 })} className={`w-full p-2 border rounded-lg ${theme.input}`} />}
-        <div className="flex items-center justify-between"><span className={theme.text}>% ingresos</span><button onClick={() => guardarConfig({ ...config, alertaPorcentaje: !config.alertaPorcentaje })} className={`w-10 h-5 rounded-full ${config.alertaPorcentaje ? 'bg-amber-500' : 'bg-slate-300'}`}><div className={`w-4 h-4 bg-white rounded-full shadow transform ${config.alertaPorcentaje ? 'translate-x-5' : 'translate-x-0.5'}`} /></button></div>
-        {config.alertaPorcentaje && <div><span className={`text-sm ${theme.textMuted}`}>{config.porcentajeAlerta}%</span><input type="range" min="50" max="100" value={config.porcentajeAlerta} onChange={e => guardarConfig({ ...config, porcentajeAlerta: parseInt(e.target.value) })} className="w-full" /></div>}
+        
+        {/* Alerta de gasto alto individual */}
+        <div className={`p-3 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-slate-50'}`}>
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <span className={`font-medium ${theme.text}`}>Alerta por gasto alto</span>
+              <p className={`text-xs ${theme.textMuted}`}>Avisar cuando un consumo individual supere el límite</p>
+            </div>
+            <button onClick={() => guardarConfig({ ...config, alertaGastoAlto: !config.alertaGastoAlto })} className={`w-10 h-5 rounded-full flex-shrink-0 ${config.alertaGastoAlto ? 'bg-amber-500' : 'bg-slate-300'}`}><div className={`w-4 h-4 bg-white rounded-full shadow transform ${config.alertaGastoAlto ? 'translate-x-5' : 'translate-x-0.5'}`} /></button>
+          </div>
+          {config.alertaGastoAlto && (
+            <div>
+              <label className={`text-xs ${theme.textMuted}`}>Límite de alerta:</label>
+              <input type="number" value={config.montoAlertaGasto} onChange={e => guardarConfig({ ...config, montoAlertaGasto: parseInt(e.target.value) || 0 })} className={`w-full p-2 border rounded-lg mt-1 ${theme.input}`} placeholder="Ej: 50000" />
+              <p className={`text-xs ${theme.textMuted} mt-1`}>Te avisará si gastás más de {formatCurrency(config.montoAlertaGasto)} en un solo consumo</p>
+            </div>
+          )}
+        </div>
+        
+        {/* Alerta de porcentaje de ingresos */}
+        <div className={`p-3 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-slate-50'}`}>
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <span className={`font-medium ${theme.text}`}>Alerta por % de ingresos</span>
+              <p className={`text-xs ${theme.textMuted}`}>Avisar cuando tus gastos totales superen un % de tus ingresos</p>
+            </div>
+            <button onClick={() => guardarConfig({ ...config, alertaPorcentaje: !config.alertaPorcentaje })} className={`w-10 h-5 rounded-full flex-shrink-0 ${config.alertaPorcentaje ? 'bg-amber-500' : 'bg-slate-300'}`}><div className={`w-4 h-4 bg-white rounded-full shadow transform ${config.alertaPorcentaje ? 'translate-x-5' : 'translate-x-0.5'}`} /></button>
+          </div>
+          {config.alertaPorcentaje && (
+            <div>
+              <div className="flex justify-between items-center">
+                <label className={`text-xs ${theme.textMuted}`}>Porcentaje límite:</label>
+                <span className={`text-lg font-bold ${theme.text}`}>{config.porcentajeAlerta}%</span>
+              </div>
+              <input type="range" min="50" max="100" step="5" value={config.porcentajeAlerta} onChange={e => guardarConfig({ ...config, porcentajeAlerta: parseInt(e.target.value) })} className="w-full mt-2" />
+              <p className={`text-xs ${theme.textMuted} mt-1`}>Te avisará cuando gastes más del {config.porcentajeAlerta}% de tus ingresos ({formatCurrency(totalIngresos * config.porcentajeAlerta / 100)} de {formatCurrency(totalIngresos)})</p>
+            </div>
+          )}
+        </div>
       </div>
       <div className={`border rounded-xl p-4 ${theme.card}`}><div className="flex items-center gap-2 mb-2"><Download className="w-5 h-5 text-indigo-500" /><span className={`font-semibold ${theme.text}`}>Instalar App</span></div><p className={`text-sm ${theme.textMuted}`}>Menú → Agregar a inicio</p></div>
     </div>
@@ -845,6 +960,85 @@ const MonityApp = () => {
       </nav>
       {modal === 'ingreso' && <ModalIngreso />}
       {modal === 'cuenta' && <ModalCuenta />}
+      {modal === 'consumo' && <ModalConsumo />}
+      {modal === 'pago' && <ModalPago />}
+      {modal === 'editar-mov' && <ModalEditarMov />}
+      {modal === 'editar-cuota' && <ModalEditarCuota />}
+      {alertaActiva && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"><div className={`rounded-2xl w-full max-w-sm p-6 text-center ${darkMode ? 'bg-gray-800' : 'bg-white'}`}><div className="w-16 h-16 mx-auto mb-4 bg-amber-100 rounded-full flex items-center justify-center"><Bell className="w-8 h-8 text-amber-500" /></div><h3 className={`text-lg font-bold mb-2 ${theme.text}`}>¡Atención!</h3><p className={`mb-6 ${theme.textMuted}`}>{alertaActiva.mensaje}</p><button onClick={() => setAlertaActiva(null)} className="w-full p-3 bg-amber-500 text-white rounded-xl font-medium">Entendido</button></div></div>)}
+    </div>
+  );
+};
+
+export default MonityApp;
+`p-4 border-t flex gap-3 ${theme.border}`}>
+            <button onClick={() => setModal(null)} className={`flex-1 p-3 border rounded-xl ${theme.border} ${theme.text}`}>Cancelar</button>
+            <button onClick={guardar} disabled={!cuentaId || !monto || parseFloat(monto) <= 0} className="flex-1 p-3 bg-blue-600 text-white rounded-xl disabled:opacity-50">Registrar Pago</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const ModalEditarMov = () => {
+    const [desc, setDesc] = useState(movimientoEditar?.descripcion || '');
+    const [monto, setMonto] = useState(movimientoEditar?.monto?.toString() || '');
+    const [cat, setCat] = useState(movimientoEditar?.categoria || 'otros');
+    const [fecha, setFecha] = useState(movimientoEditar?.fecha || '');
+    if (!movimientoEditar) return null;
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className={`rounded-2xl w-full max-w-lg ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+          <div className={`p-4 border-b flex justify-between ${theme.border}`}><h3 className={`font-bold ${theme.text}`}>Editar Consumo</h3><button onClick={() => { setModal(null); setMovimientoEditar(null); }}><X className={`w-5 h-5 ${theme.text}`} /></button></div>
+          <div className="p-4 space-y-4">
+            <input type="text" value={desc} onChange={e => setDesc(e.target.value)} placeholder="Descripción" className={`w-full p-3 border rounded-xl ${theme.input}`} />
+            <input type="number" value={monto} onChange={e => setMonto(e.target.value)} placeholder="Monto" className={`w-full p-3 border rounded-xl ${theme.input}`} />
+            <select value={cat} onChange={e => setCat(e.target.value)} className={`w-full p-3 border rounded-xl ${theme.input}`}>{CATEGORIAS.map(c => <option key={c.id} value={c.id}>{c.icon} {c.nombre}</option>)}</select>
+            <DatePicker label="Fecha" value={fecha} onChange={setFecha} darkMode={darkMode} theme={theme} />
+          </div>
+          <div className={`p-4 border-t flex gap-3 ${theme.border}`}><button onClick={() => { setModal(null); setMovimientoEditar(null); }} className={`flex-1 p-3 border rounded-xl ${theme.border} ${theme.text}`}>Cancelar</button><button onClick={async () => { await actualizarMovimiento(movimientoEditar.id, { descripcion: desc, monto: parseFloat(monto), categoria: cat, fecha }); setModal(null); setMovimientoEditar(null); }} className="flex-1 p-3 bg-blue-600 text-white rounded-xl">Guardar</button></div>
+        </div>
+      </div>
+    );
+  };
+
+  const ModalEditarCuota = () => {
+    const [desc, setDesc] = useState(cuotaEditar?.descripcion || '');
+    const [monto, setMonto] = useState(cuotaEditar?.montoCuota?.toString() || '');
+    const [total, setTotal] = useState(cuotaEditar?.cuotasTotales?.toString() || '');
+    const [pend, setPend] = useState(cuotaEditar?.cuotasPendientes?.toString() || '');
+    if (!cuotaEditar) return null;
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className={`rounded-2xl w-full max-w-lg ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+          <div className={`p-4 border-b flex justify-between ${theme.border}`}><h3 className={`font-bold ${theme.text}`}>Editar Cuota</h3><button onClick={() => { setModal(null); setCuotaEditar(null); }}><X className={`w-5 h-5 ${theme.text}`} /></button></div>
+          <div className="p-4 space-y-4">
+            <input type="text" value={desc} onChange={e => setDesc(e.target.value)} placeholder="Descripción" className={`w-full p-3 border rounded-xl ${theme.input}`} />
+            <input type="number" value={monto} onChange={e => setMonto(e.target.value)} placeholder="Monto/cuota" className={`w-full p-3 border rounded-xl ${theme.input}`} />
+            <div className="grid grid-cols-2 gap-4"><div><label className={`text-sm ${theme.textMuted}`}>Totales</label><input type="number" value={total} onChange={e => setTotal(e.target.value)} className={`w-full p-3 border rounded-xl ${theme.input}`} /></div><div><label className={`text-sm ${theme.textMuted}`}>Pendientes</label><input type="number" value={pend} onChange={e => setPend(e.target.value)} className={`w-full p-3 border rounded-xl ${theme.input}`} /></div></div>
+          </div>
+          <div className={`p-4 border-t flex gap-3 ${theme.border}`}><button onClick={() => { setModal(null); setCuotaEditar(null); }} className={`flex-1 p-3 border rounded-xl ${theme.border} ${theme.text}`}>Cancelar</button><button onClick={async () => { await actualizarCuota(cuotaEditar.id, { descripcion: desc, montoCuota: parseFloat(monto), cuotasTotales: parseInt(total), cuotasPendientes: parseInt(pend), estado: parseInt(pend) <= 0 ? 'finalizada' : 'activa' }); setModal(null); setCuotaEditar(null); }} className="flex-1 p-3 bg-purple-600 text-white rounded-xl">Guardar</button></div>
+        </div>
+      </div>
+    );
+  };
+
+  const tabs = [{ id: 'dashboard', label: 'Inicio', icon: <Home className="w-5 h-5" /> }, { id: 'stats', label: 'Stats', icon: <BarChart3 className="w-5 h-5" /> }, { id: 'config', label: 'Config', icon: <Sliders className="w-5 h-5" /> }];
+
+  return (
+    <div className={`min-h-screen ${theme.bg}`}>
+      <header className={`border-b sticky top-0 z-40 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-slate-200'}`}>
+        <div className="max-w-5xl mx-auto px-4 py-3 flex justify-between items-center">
+          <div className="flex items-center gap-3"><MonityLogo size={36} /><div><h1 className={`font-bold ${theme.text}`}>Monity</h1><p className={`text-xs ${theme.textMuted}`}>{user.email}</p></div></div>
+          <div className="flex items-center gap-2"><button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded-lg ${theme.hover}`}>{darkMode ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5 text-slate-600" />}</button>{user.photoURL && <img src={user.photoURL} alt="" className="w-8 h-8 rounded-full" />}<button onClick={handleLogout} className={`p-2 ${theme.textMuted}`}><LogOut className="w-5 h-5" /></button></div>
+        </div>
+      </header>
+      <main className="max-w-5xl mx-auto px-4 py-6 pb-24">{tab === 'dashboard' && <Dashboard />}{tab === 'detalle' && <DetalleCuenta />}{tab === 'stats' && <Stats />}{tab === 'config' && <Config />}</main>
+      <nav className={`fixed bottom-0 left-0 right-0 border-t z-40 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-slate-200'}`}>
+        <div className="max-w-5xl mx-auto flex justify-around py-2">{tabs.map(t => (<button key={t.id} onClick={() => { setTab(t.id); setCuentaActiva(null); }} className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl ${tab === t.id || (t.id === 'dashboard' && tab === 'detalle') ? (darkMode ? 'text-white bg-gray-700' : 'text-indigo-600 bg-indigo-50') : theme.textMuted}`}>{t.icon}<span className="text-xs">{t.label}</span></button>))}</div>
+      </nav>
+      {modal === 'ingreso' && <ModalIngreso />}
+      {modal === 'cuenta' && <ModalCuenta />}
+      {modal === 'editar-cuenta' && <ModalEditarCuenta />}
       {modal === 'consumo' && <ModalConsumo />}
       {modal === 'pago' && <ModalPago />}
       {modal === 'editar-mov' && <ModalEditarMov />}

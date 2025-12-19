@@ -2,7 +2,6 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
-import * as serviceWorkerRegistration from './serviceWorkerRegistration';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
@@ -11,16 +10,22 @@ root.render(
   </React.StrictMode>
 );
 
-// Registrar service worker para PWA
-// Esto permite que la app funcione offline y se actualice automáticamente
-serviceWorkerRegistration.register({
-  onUpdate: (registration) => {
-    console.log('Actualizando Monity...');
-    if (registration.waiting) {
-      registration.waiting.postMessage('skipWaiting');
-    }
-  },
-  onSuccess: () => {
-    console.log('Monity listo para uso offline');
-  }
-});
+// Desregistrar cualquier Service Worker existente para evitar problemas de cache
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(registrations => {
+    registrations.forEach(registration => {
+      registration.unregister();
+      console.log('Service Worker desregistrado');
+    });
+  });
+}
+
+// Limpiar caches antiguos
+if ('caches' in window) {
+  caches.keys().then(names => {
+    names.forEach(name => {
+      caches.delete(name);
+      console.log('Cache eliminado:', name);
+    });
+  });
+}

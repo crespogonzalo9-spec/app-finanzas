@@ -200,6 +200,7 @@ const MonityApp = () => {
   const [tab, setTab] = useState('dashboard');
   const [modal, setModal] = useState(null);
   const [cuentaActiva, setCuentaActiva] = useState(null);
+  const [cuentaEditar, setCuentaEditar] = useState(null);
   const [movimientoEditar, setMovimientoEditar] = useState(null);
   const [cuotaEditar, setCuotaEditar] = useState(null);
   const [alertaActiva, setAlertaActiva] = useState(null);
@@ -257,6 +258,18 @@ const MonityApp = () => {
       await guardarPeriodo({ cuentaId: ref.id, fechaInicio: cuenta.fechaCierreAnterior, fechaCierre: cuenta.fechaCierre, estado: 'abierto', saldoInicial: 0 });
     }
     return nueva;
+  };
+
+  const actualizarCuenta = async (cuenta) => {
+    if (!user) return;
+    try {
+      const cuentaRef = doc(db, 'users', user.uid, 'cuentas', cuenta.id);
+      await updateDoc(cuentaRef, cuenta);
+      setCuentas(prev => prev.map(c => c.id === cuenta.id ? { ...c, ...cuenta } : c));
+      return cuenta;
+    } catch (e) {
+      console.error("Error al actualizar cuenta:", e);
+    }
   };
 
   const eliminarCuenta = async (id) => {
@@ -843,30 +856,82 @@ const MonityApp = () => {
     );
   };
 
-  const ModalCuenta = () => {
-    const [nombre, setNombre] = useState('');
-    const [tipoCuenta, setTipoCuenta] = useState('tarjeta_credito');
-    const [entidad, setEntidad] = useState('');
-    const [fechaCierre, setFechaCierre] = useState('');
-    const [fechaVencimiento, setFechaVencimiento] = useState('');
-    const [fechaCierreAnterior, setFechaCierreAnterior] = useState('');
-    return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <div className={`rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-          <div className={`p-4 border-b flex justify-between ${theme.border}`}><h3 className={`font-bold ${theme.text}`}>Nueva Cuenta</h3><button onClick={() => setModal(null)}><X className={`w-5 h-5 ${theme.text}`} /></button></div>
-          <div className="p-4 space-y-4">
-            <div><label className={`block text-sm mb-1 ${theme.textMuted}`}>Tipo</label><select value={tipoCuenta} onChange={e => setTipoCuenta(e.target.value)} className={`w-full p-3 border rounded-xl ${theme.input}`}>{TIPOS_CUENTA.map(t => <option key={t.id} value={t.id}>{t.icon} {t.nombre}</option>)}</select></div>
-            <div><label className={`block text-sm mb-1 ${theme.textMuted}`}>Entidad</label><select value={entidad} onChange={e => setEntidad(e.target.value)} className={`w-full p-3 border rounded-xl ${theme.input}`}><option value="">Seleccionar...</option><optgroup label="Bancos">{BANCOS_ARGENTINA.map(b => <option key={b.id} value={b.nombre}>{b.nombre}</option>)}</optgroup><optgroup label="Billeteras">{BILLETERAS_VIRTUALES.map(b => <option key={b.id} value={b.nombre}>{b.nombre}</option>)}</optgroup></select></div>
-            <input type="text" value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Nombre personalizado" className={`w-full p-3 border rounded-xl ${theme.input}`} />
-            <DatePicker label="Cierre anterior" value={fechaCierreAnterior} onChange={setFechaCierreAnterior} darkMode={darkMode} theme={theme} />
-            <DatePicker label="Cierre actual" value={fechaCierre} onChange={setFechaCierre} darkMode={darkMode} theme={theme} />
-            <DatePicker label="Vencimiento" value={fechaVencimiento} onChange={setFechaVencimiento} darkMode={darkMode} theme={theme} />
-          </div>
-          <div className={`p-4 border-t flex gap-3 ${theme.border}`}><button onClick={() => setModal(null)} className={`flex-1 p-3 border rounded-xl ${theme.border} ${theme.text}`}>Cancelar</button><button onClick={async () => { await guardarCuenta({ tipo: 'contable', nombre: nombre || entidad, tipoCuenta, entidad, fechaCierre, fechaVencimiento, fechaCierreAnterior: fechaCierreAnterior || fechaCierre }); setModal(null); }} disabled={!fechaCierre || !entidad} className="flex-1 p-3 bg-indigo-600 text-white rounded-xl disabled:opacity-50">Crear</button></div>
-        </div>
-      </div>
-    );
+  const ModalCuenta = ({ onClose, onSave, onUpdate, cuenta }) => {
+  const [nombre, setNombre] = useState(cuenta ? cuenta.nombre : '');
+  const [tipo, setTipo] = useState(cuenta ? cuenta.tipo : 'otros');
+  const [color, setColor] = useState(cuenta ? cuenta.color : '#6366f1');
+  const [montoMensual, setMontoMensual] = useState(cuenta ? cuenta.montoMensual : '');
+  const [fechaCierre, setFechaCierre] = useState(cuenta ? cuenta.fechaCierre : '');
+
+  useEffect(() => {
+    if (cuenta) {
+      setNombre(cuenta.nombre);
+      setTipo(cuenta.tipo);
+      setColor(cuenta.color);
+      if (cuenta.montoMensual) setMontoMensual(cuenta.montoMensual);
+      if (cuenta.fechaCierre) setFechaCierre(cuenta.fechaCierre);
+    }
+  }, [cuenta]);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const datos = { 
+      nombre, 
+      tipo, 
+      color,
+      ...(montoMensual && { montoMensual: parseFloat(montoMensual) }),
+      ...(fechaCierre && { fechaCierre })
+    };
+    
+    if (cuenta) {
+      onUpdate({ ...datos, id: cuenta.id });
+    } else {
+      onSave(datos);
+    }
+    onClose();
   };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl w-full max-w-sm">
+        <h3 className="text-lg font-bold mb-4 dark:text-white">
+          {cuenta ? 'Editar Cuenta' : 'Nueva Cuenta'}
+        </h3>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm mb-1 dark:text-gray-400">Nombre</label>
+            <input value={nombre} onChange={e => setNombre(e.target.value)} className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white" required />
+          </div>
+          <div>
+            <label className="block text-sm mb-1 dark:text-gray-400">Tipo</label>
+            <select value={tipo} onChange={e => setTipo(e.target.value)} className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+              <option value="otros">Otros</option>
+              <option value="ingreso">Ingreso</option>
+              <option value="banco">Banco</option>
+              <option value="efectivo">Efectivo</option>
+              <option value="tarjeta">Tarjeta</option>
+            </select>
+          </div>
+          <div className="flex gap-2 mt-6">
+            <button 
+  onClick={(e) => {
+    e.stopPropagation();
+    setCuentaEditar(c); 
+    setModal('cuenta');
+  }}
+  className="p-2 rounded-lg hover:bg-gray-700"
+>
+  <Edit3 className="w-4 h-4 text-blue-500" />
+</button>
+            <button type="submit" className="flex-1 p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+              {cuenta ? 'Actualizar' : 'Guardar'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
 
   const ModalConsumo = () => {
     const [cuentaId, setCuentaId] = useState('');
@@ -889,7 +954,7 @@ const MonityApp = () => {
       setModal(null);
     };
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="fixed inset-0 b-black/50 flex items-center justify-center z-50 p-4">
         <div className={`rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
           <div className={`p-4 border-b flex justify-between ${theme.border}`}><h3 className={`font-bold ${theme.text}`}>Cargar Consumo</h3><button onClick={() => setModal(null)}><X className={`w-5 h-5 ${theme.text}`} /></button></div>
           <div className="p-4 space-y-4">
@@ -990,7 +1055,14 @@ const MonityApp = () => {
         <div className="max-w-5xl mx-auto flex justify-around py-2">{tabs.map(t => (<button key={t.id} onClick={() => { setTab(t.id); setCuentaActiva(null); }} className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl ${tab === t.id || (t.id === 'dashboard' && tab === 'detalle') ? (darkMode ? 'text-white bg-gray-700' : 'text-indigo-600 bg-indigo-50') : theme.textMuted}`}>{t.icon}<span className="text-xs">{t.label}</span></button>))}</div>
       </nav>
       {modal === 'ingreso' && <ModalIngreso />}
-      {modal === 'cuenta' && <ModalCuenta />}
+      {modal === 'cuenta' && (
+  <ModalCuenta 
+    onClose={() => { setModal(null); setCuentaEditar(null); }} 
+    onSave={guardarCuenta}
+    onUpdate={actualizarCuenta}
+    cuenta={cuentaEditar} 
+  />
+)}
       {modal === 'consumo' && <ModalConsumo />}
       {modal === 'pago' && <ModalPago />}
       {modal === 'editar-mov' && <ModalEditarMov />}

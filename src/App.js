@@ -359,7 +359,16 @@ const MonityApp = () => {
   
   // NUEVOS CÁLCULOS PARA PUNTO 3
   const calcularTotalConsumos = () => {
-    return movimientos.reduce((acc, m) => acc + (m.monto || 0), 0);
+    // Solo contar movimientos que NO sean débitos automáticos o que sean débitos activos
+    return movimientos
+      .filter(m => {
+        // Si es débito, debe estar en la lista de débitos activos
+        if (m.debitoAutomaticoId) {
+          return debitosAutomaticos.some(d => d.id === m.debitoAutomaticoId);
+        }
+        return true; // Si no es débito, contar siempre
+      })
+      .reduce((acc, m) => acc + (m.monto || 0), 0);
   };
 
   const calcularSaldoDisponible = () => {
@@ -555,54 +564,97 @@ const MonityApp = () => {
     const [cuentaId, setCuentaId] = useState('');
     const [descripcion, setDescripcion] = useState('');
     const [monto, setMonto] = useState('');
-    const [categoria, setCategoria] = useState('otros');
     const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
-    const [tipoQuotas, setTipoQuotas] = useState('sin'); // 'sin', 'cantidad', 'monto'
+    const [categoria, setCategoria] = useState('otros');
+    const [tipoQuotas, setTipoQuotas] = useState('sin'); // 'sin', 'totalYCantidad', 'montoPorCuota'
+    const [montoTotal, setMontoTotal] = useState('');
     const [cantidadQuotas, setCantidadQuotas] = useState('');
-    const [montoQuota, setMontoQuota] = useState('');
+    const [montoPorCuota, setMontoPorCuota] = useState('');
+    const [numeroCuotaActual, setNumeroCuotaActual] = useState('1');
     const [esDebito, setEsDebito] = useState(false);
 
-    const montoTotal = parseFloat(monto) || 0;
-    const numCuotas = tipoQuotas === 'cantidad' ? parseInt(cantidadQuotas) || 1 : tipoQuotas === 'monto' && montoQuota ? Math.ceil(montoTotal / parseFloat(montoQuota)) : 1;
-    const montoCuota = numCuotas > 1 ? (tipoQuotas === 'cantidad' ? montoTotal / numCuotas : parseFloat(montoQuota)) : montoTotal;
+    // Cálculos para OPCIÓN 1: Total y Cantidad
+    const montoPorCuotaCalculado1 = tipoQuotas === 'totalYCantidad' && montoTotal && cantidadQuotas 
+      ? (parseFloat(montoTotal) / parseInt(cantidadQuotas)).toFixed(2)
+      : 0;
+
+    // Cálculos para OPCIÓN 2: Monto por Cuota
+    const cuotasRestantes = tipoQuotas === 'montoPorCuota' && montoPorCuota && cantidadQuotas
+      ? parseInt(cantidadQuotas) - (parseInt(numeroCuotaActual) - 1)
+      : 0;
 
     const guardar = async () => {
-      if (esDebito) {
-        // Guardar como débito automático
-        await guardarDebito({ 
-          cuentaId, 
-          descripcion, 
-          monto: montoTotal, 
-          categoria, 
-          fecha: new Date().toISOString().slice(0, 10),
-          timestamp: new Date().toISOString(),
-          cuotas: tipoQuotas !== 'sin' ? { tipo: tipoQuotas, cantidad: numCuotas, montoCuota } : null
-        });
-      } else {
-        // Guardar como consumo normal
-        if (tipoQuotas !== 'sin' && numCuotas > 1) {
-          const cuotaId = await guardarCuota({ 
-            cuentaId, 
-            descripcion, 
-            montoTotal, 
-            montoCuota, 
-            cuotasTotales: numCuotas, 
-            cuotasPendientes: numCuotas - 1, 
-            categoria, 
-            fechaInicio: fecha, 
-            estado: 'activa' 
-          });
-          await guardarMovimiento({ 
-            cuentaId, 
-            descripcion: `${descripcion} (1/${numCuotas})`, 
-            monto: montoCuota, 
-            categoria: 'cuota', 
-            fecha, 
-            esCuota: true, 
-            cuotaId 
-          });
+      if (tipoQuotas === 'sin') {
+        // Sin cuotas - consumo simple
+        const datos = {
+          cuentaId,
+          descripcion,
+          monto: parseFloat(monto),
+          categoria,
+          fecha,
+          tipo: 'consumo'
+        };
+        if (esDebito) {
+          datos.esDebito = true;
+          await guardarDebito(datos);
         } else {
-          await guardarMovimiento({ cuentaId, descripcion, monto: montoTotal, categoria, fecha });
+          await guardarMovimiento(datos);
+        }
+      } else if (tipoQuotas === 'totalYCantidad') {
+        // OPCIÓN 1: Total monto y cantidad de cuotas
+        const montoPorCuota = parseFloat(montoTotal) / parseInt(cantidadQuotas);
+        const cuotaId = await guardarCuota({
+          cuentaId,
+          descripcion,
+          montoTotal: parseFloat(montoTotal),
+          montoCuota: montoPorCuota,
+          cuotasTotales: parseInt(cantidadQuotas),
+          cuotasPendientes: parseInt(cantidadQuotas) - 1,
+          categoria,
+          fechaInicio: fecha,
+          cuotaActual: 1,
+          estado: 'activa'
+        });
+
+        // Crear el primer movimiento
+        await guardarMovimiento({
+          cuentaId,
+          descripcion: `${descripcion} (1/${cantidadQuotas})`,
+          monto: montoPorCuota,
+          categoria: 'cuota',
+          fecha,
+          esCuota: true,
+          cuotaId,
+          esDebito: false
+        });
+      } else if (tipoQuotas === 'montoPorCuota') {
+        // OPCIÓN 2: Monto por cuota y cantidad
+        const cuotaId = await guardarCuota({
+          cuentaId,
+          descripcion,
+          montoTotal: parseFloat(montoPorCuota) * parseInt(cantidadQuotas),
+          montoCuota: parseFloat(montoPorCuota),
+          cuotasTotales: parseInt(cantidadQuotas),
+          cuotasPendientes: cuotasRestantes,
+          cuotaActual: parseInt(numeroCuotaActual),
+          categoria,
+          fechaInicio: fecha,
+          estado: 'activa'
+        });
+
+        // Crear movimientos solo para las cuotas pendientes
+        for (let i = 0; i < cuotasRestantes; i++) {
+          const numeroCuota = parseInt(numeroCuotaActual) + i;
+          await guardarMovimiento({
+            cuentaId,
+            descripcion: `${descripcion} (${numeroCuota}/${cantidadQuotas})`,
+            monto: parseFloat(montoPorCuota),
+            categoria: 'cuota',
+            fecha: new Date(new Date(fecha).getTime() + i * 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+            esCuota: true,
+            cuotaId,
+            esDebito: false
+          });
         }
       }
       setModal(null);
@@ -611,45 +663,105 @@ const MonityApp = () => {
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
         <div className={`rounded-2xl w-full max-w-lg my-4 ${theme.card}`}>
-          <div className={`p-4 border-b flex justify-between ${theme.border}`}><h3 className={`font-bold ${theme.text}`}>Cargar Consumo</h3><button onClick={() => setModal(null)}><X className={`w-5 h-5 ${theme.text}`} /></button></div>
+          <div className={`p-4 border-b flex justify-between ${theme.border}`}>
+            <h3 className={`font-bold ${theme.text}`}>Cargar Consumo</h3>
+            <button onClick={() => setModal(null)}><X className={`w-5 h-5 ${theme.text}`} /></button>
+          </div>
           <div className="p-4 space-y-4">
-            <select value={cuentaId} onChange={e => setCuentaId(e.target.value)} className={`w-full p-3 border rounded-xl ${theme.input}`}><option value="">Cuenta...</option>{cuentasContables.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}</select>
+            <select value={cuentaId} onChange={e => setCuentaId(e.target.value)} className={`w-full p-3 border rounded-xl ${theme.input}`}>
+              <option value="">Cuenta...</option>
+              {cuentasContables.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+            </select>
             <input type="text" value={descripcion} onChange={e => setDescripcion(e.target.value)} placeholder="Descripción" className={`w-full p-3 border rounded-xl ${theme.input}`} />
-            <input type="number" value={monto} onChange={e => setMonto(e.target.value)} placeholder="Monto" className={`w-full p-3 border rounded-xl ${theme.input}`} />
-            <select value={categoria} onChange={e => setCategoria(e.target.value)} className={`w-full p-3 border rounded-xl ${theme.input}`}>{CATEGORIAS.filter(c => c.id !== 'cuota').map(c => <option key={c.id} value={c.id}>{c.icon} {c.nombre}</option>)}</select>
-            <DatePicker label="Fecha" value={fecha} onChange={setFecha} darkMode={darkMode} theme={theme} />
             
-            {/* PUNTO 4: CUOTAS FLEXIBLES */}
-            <div className={`p-3 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-slate-50'}`}>
-              <div className={`text-sm font-medium ${theme.text} mb-3`}>Opción de Cuotas</div>
+            {tipoQuotas === 'sin' && (
+              <input type="number" value={monto} onChange={e => setMonto(e.target.value)} placeholder="Monto" className={`w-full p-3 border rounded-xl ${theme.input}`} />
+            )}
+
+            <select value={categoria} onChange={e => setCategoria(e.target.value)} className={`w-full p-3 border rounded-xl ${theme.input}`}>
+              {CATEGORIAS.filter(c => c.id !== 'cuota').map(c => <option key={c.id} value={c.id}>{c.icon} {c.nombre}</option>)}
+            </select>
+            
+            <DatePicker label="Fecha" value={fecha} onChange={setFecha} darkMode={darkMode} theme={theme} />
+
+            {/* SISTEMA DE CUOTAS MEJORADO */}
+            <div className={`p-3 rounded-xl border ${theme.border}`}>
+              <div className={`text-sm font-medium ${theme.text} mb-3`}>Cargar en Cuotas</div>
               <select value={tipoQuotas} onChange={e => setTipoQuotas(e.target.value)} className={`w-full p-3 border rounded-xl ${theme.input} mb-3`}>
-                <option value="sin">Sin cuotas</option>
-                <option value="cantidad">Por cantidad de cuotas</option>
-                <option value="monto">Por monto de cuota</option>
+                <option value="sin">Sin cuotas - Monto único</option>
+                <option value="totalYCantidad">Opción 1: Total monto + Cantidad de cuotas</option>
+                <option value="montoPorCuota">Opción 2: Monto por cuota + Cantidad + Número actual</option>
               </select>
-              {tipoQuotas === 'cantidad' && (
-                <div>
-                  <input type="number" value={cantidadQuotas} onChange={e => setCantidadQuotas(e.target.value)} placeholder="Cantidad de cuotas" className={`w-full p-3 border rounded-xl ${theme.input} mb-2`} />
-                  {cantidadQuotas && monto && <p className={`text-sm ${theme.textMuted}`}>Cuota: {formatCurrency(montoCuota)}</p>}
+
+              {/* OPCIÓN 1: TOTAL Y CANTIDAD */}
+              {tipoQuotas === 'totalYCantidad' && (
+                <div className="space-y-3">
+                  <div>
+                    <label className={`text-xs ${theme.textMuted}`}>Monto Total</label>
+                    <input type="number" value={montoTotal} onChange={e => setMontoTotal(e.target.value)} placeholder="Ej: 120000" className={`w-full p-3 border rounded-xl ${theme.input}`} />
+                  </div>
+                  <div>
+                    <label className={`text-xs ${theme.textMuted}`}>Cantidad de Cuotas</label>
+                    <input type="number" value={cantidadQuotas} onChange={e => setCantidadQuotas(e.target.value)} placeholder="Ej: 12" className={`w-full p-3 border rounded-xl ${theme.input}`} />
+                  </div>
+                  {montoPorCuotaCalculado1 > 0 && (
+                    <div className={`p-3 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-blue-50'}`}>
+                      <div className={`text-xs ${theme.textMuted}`}>Monto por cuota:</div>
+                      <div className={`text-xl font-bold text-blue-500`}>{formatCurrency(montoPorCuotaCalculado1)}</div>
+                      <div className={`text-xs ${theme.textMuted} mt-2`}>Se cargará 1 cuota cada mes durante {cantidadQuotas} meses</div>
+                      <div className={`text-xs ${theme.textMuted} mt-1`}>Ejemplo: AIRE ACONDICIONADO $10.000 (1/12), (2/12)... (12/12)</div>
+                    </div>
+                  )}
                 </div>
               )}
-              {tipoQuotas === 'monto' && (
-                <div>
-                  <input type="number" value={montoQuota} onChange={e => setMontoQuota(e.target.value)} placeholder="Monto por cuota" className={`w-full p-3 border rounded-xl ${theme.input} mb-2`} />
-                  {montoQuota && monto && <p className={`text-sm ${theme.textMuted}`}>Cuotas: {numCuotas}</p>}
+
+              {/* OPCIÓN 2: MONTO POR CUOTA */}
+              {tipoQuotas === 'montoPorCuota' && (
+                <div className="space-y-3">
+                  <div>
+                    <label className={`text-xs ${theme.textMuted}`}>Monto por Cuota</label>
+                    <input type="number" value={montoPorCuota} onChange={e => setMontoPorCuota(e.target.value)} placeholder="Ej: 10000" className={`w-full p-3 border rounded-xl ${theme.input}`} />
+                  </div>
+                  <div>
+                    <label className={`text-xs ${theme.textMuted}`}>Total de Cuotas</label>
+                    <input type="number" value={cantidadQuotas} onChange={e => setCantidadQuotas(e.target.value)} placeholder="Ej: 12" className={`w-full p-3 border rounded-xl ${theme.input}`} />
+                  </div>
+                  <div>
+                    <label className={`text-xs ${theme.textMuted}`}>Número de Cuota Actual (desde dónde empiezas)</label>
+                    <input type="number" value={numeroCuotaActual} onChange={e => setNumeroCuotaActual(e.target.value)} min="1" className={`w-full p-3 border rounded-xl ${theme.input}`} placeholder="Ej: 1" />
+                  </div>
+                  {montoPorCuota && cantidadQuotas && numeroCuotaActual && (
+                    <div className={`p-3 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-blue-50'}`}>
+                      <div className={`text-xs ${theme.textMuted}`}>Monto por cuota:</div>
+                      <div className={`text-xl font-bold text-blue-500`}>{formatCurrency(montoPorCuota)}</div>
+                      <div className={`text-xs ${theme.textMuted} mt-2`}>Cuotas pendientes: {cuotasRestantes} (de {cantidadQuotas})</div>
+                      <div className={`text-xs ${theme.textMuted} mt-1`}>Se cargarán desde cuota {numeroCuotaActual} hasta {cantidadQuotas}</div>
+                      <div className={`text-xs ${theme.textMuted} mt-1`}>Ejemplo: AIRE ACONDICIONADO $10.000 (6/12), (7/12)... (12/12)</div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
 
-            {/* PUNTO 5: DÉBITOS AUTOMÁTICOS */}
+            {/* DÉBITOS AUTOMÁTICOS */}
             <div className={`p-3 rounded-xl border ${theme.border}`}>
               <label className="flex items-center gap-3 cursor-pointer">
-                <input type="checkbox" checked={esDebito} onChange={e => setEsDebito(e.target.checked)} className="w-4 h-4" />
-                <span className={`text-sm font-medium ${theme.text}`}>Débito automático (se repetirá cada mes)</span>
+                <input type="checkbox" checked={esDebito} onChange={e => setEsDebito(e.target.checked)} disabled={tipoQuotas !== 'sin'} className="w-4 h-4" />
+                <span className={`text-sm font-medium ${tipoQuotas !== 'sin' ? theme.textMuted : theme.text}`}>
+                  Débito automático (solo para consumos sin cuotas)
+                </span>
               </label>
             </div>
           </div>
-          <div className={`p-4 border-t flex gap-3 ${theme.border}`}><button onClick={() => setModal(null)} className={`flex-1 p-3 border rounded-xl ${theme.border} ${theme.text}`}>Cancelar</button><button onClick={guardar} disabled={!cuentaId || !monto || !descripcion} className="flex-1 p-3 bg-amber-500 text-white rounded-xl disabled:opacity-50">Cargar</button></div>
+          <div className={`p-4 border-t flex gap-3 ${theme.border}`}>
+            <button onClick={() => setModal(null)} className={`flex-1 p-3 border rounded-xl ${theme.border} ${theme.text}`}>Cancelar</button>
+            <button onClick={guardar} disabled={
+              !cuentaId || !descripcion || !fecha ||
+              (tipoQuotas === 'sin' && !monto) ||
+              (tipoQuotas === 'totalYCantidad' && (!montoTotal || !cantidadQuotas)) ||
+              (tipoQuotas === 'montoPorCuota' && (!montoPorCuota || !cantidadQuotas || !numeroCuotaActual))
+            } className="flex-1 p-3 bg-amber-500 text-white rounded-xl disabled:opacity-50">Cargar</button>
+          </div>
         </div>
       </div>
     );

@@ -1055,7 +1055,6 @@ const MonityApp = () => {
       </div>
     </div>
   );
-  };
   
 
   // MODAL PARA CERRAR PERÍODO CON OPCIÓN DE PAGO
@@ -1408,7 +1407,6 @@ const MonityApp = () => {
     );
   };
 
-  const MonityApp = () => {
     const tabs = [
     { id: 'dashboard', label: 'Inicio', icon: <Home className="w-5 h-5" /> },
     { id: 'stats', label: 'Stats', icon: <BarChart3 className="w-5 h-5" /> },

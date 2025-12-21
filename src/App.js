@@ -45,6 +45,7 @@ const BANCOS_ARGENTINA = [
   { id: 'brubank', nombre: 'Brubank', color: '#6B21A8' },
   { id: 'rebanking', nombre: 'Rebanking', color: '#00C389' },
   { id: 'del_sol', nombre: 'Banco del Sol', color: '#FFB800' },
+  { id: 'no_bancaria', nombre: 'Entidad No Bancaria', color: '#8B5E3C' },
 ];
 
 const BILLETERAS_VIRTUALES = [
@@ -58,6 +59,7 @@ const BILLETERAS_VIRTUALES = [
   { id: 'lemon', nombre: 'Lemon Cash', color: '#FFE500' },
   { id: 'belo', nombre: 'Belo', color: '#5865F2' },
   { id: 'claro_pay', nombre: 'Claro Pay', color: '#DA291C' },
+  { id: 'otros', nombre: 'Otros', color: '#7A869A' },
 ];
 
 const TIPOS_CUENTA = [

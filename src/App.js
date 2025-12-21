@@ -659,9 +659,11 @@ const MonityApp = () => {
     const p = periodos.find(p => p.cuentaId === cuentaActiva.id && p.estado === 'abierto');
     const saldo = calcularSaldo(cuentaActiva.id);
     const cuotasC = cuotas.filter(c => c.cuentaId === cuentaActiva.id && c.estado === 'activa');
+    
+    // Mostrar TODOS los movimientos de la cuenta, no solo los del período
     const todos = [
-      ...movimientos.filter(m => m.cuentaId === cuentaActiva.id && p && m.fecha >= p.fechaInicio && m.fecha <= p.fechaCierre).map(m => ({ ...m, tipo: 'consumo' })),
-      ...pagos.filter(pago => pago.cuentaId === cuentaActiva.id && p && pago.fecha >= p.fechaInicio && pago.fecha <= p.fechaCierre).map(pago => ({ ...pago, tipo: 'pago' }))
+      ...movimientos.filter(m => m.cuentaId === cuentaActiva.id).map(m => ({ ...m, tipo: 'consumo' })),
+      ...pagos.filter(pago => pago.cuentaId === cuentaActiva.id).map(pago => ({ ...pago, tipo: 'pago' }))
     ].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
 
     return (
@@ -780,26 +782,29 @@ const MonityApp = () => {
           await guardarMovimiento(datos);
         }
       } else if (tipoQuotas === 'totalYCantidad') {
-        // OPCIÓN 1: Total monto y cantidad de cuotas
-        const montoPorCuota = parseFloat(montoTotal) / parseInt(cantidadQuotas);
+        // OPCIÓN 1: Total monto y cantidad de cuotas (empieza desde cuota 1)
+        const totalCuotas = parseInt(cantidadQuotas);
+        const montoPorCuotaCalc = parseFloat(montoTotal) / totalCuotas;
+        
         const cuotaId = await guardarCuota({
           cuentaId,
           descripcion,
           montoTotal: parseFloat(montoTotal),
-          montoCuota: montoPorCuota,
-          cuotasTotales: parseInt(cantidadQuotas),
-          cuotasPendientes: parseInt(cantidadQuotas) - 1,
+          montoCuota: montoPorCuotaCalc,
+          cuotasTotales: totalCuotas,
+          cuotasPendientes: totalCuotas - 1, // Quedan todas menos la primera
           categoria,
           fechaInicio: fecha,
           cuotaActual: 1,
           estado: 'activa'
         });
 
-        // Crear el primer movimiento
+        // Solo crear el movimiento de la PRIMERA cuota
+        // Las siguientes se generan al cerrar período
         await guardarMovimiento({
           cuentaId,
-          descripcion: `${descripcion} (1/${cantidadQuotas})`,
-          monto: montoPorCuota,
+          descripcion: `${descripcion} (1/${totalCuotas})`,
+          monto: montoPorCuotaCalc,
           categoria: 'cuota',
           fecha,
           esCuota: true,
@@ -808,33 +813,38 @@ const MonityApp = () => {
         });
       } else if (tipoQuotas === 'montoPorCuota') {
         // OPCIÓN 2: Monto por cuota y cantidad
+        // Si el usuario dice que está en cuota X de Y, las cuotas 1 a X-1 ya están pagas
+        // Solo creamos la cuota actual como movimiento, las futuras se generan al cerrar período
+        
+        const cuotaActualNum = parseInt(numeroCuotaActual);
+        const totalCuotas = parseInt(cantidadQuotas);
+        const cuotasPendientesRestantes = totalCuotas - cuotaActualNum; // Cuotas DESPUÉS de la actual
+        
         const cuotaId = await guardarCuota({
           cuentaId,
           descripcion,
-          montoTotal: parseFloat(montoPorCuota) * parseInt(cantidadQuotas),
+          montoTotal: parseFloat(montoPorCuota) * totalCuotas,
           montoCuota: parseFloat(montoPorCuota),
-          cuotasTotales: parseInt(cantidadQuotas),
-          cuotasPendientes: cuotasRestantes,
-          cuotaActual: parseInt(numeroCuotaActual),
+          cuotasTotales: totalCuotas,
+          cuotasPendientes: cuotasPendientesRestantes, // Solo las que faltan DESPUÉS de la actual
+          cuotaActual: cuotaActualNum,
           categoria,
           fechaInicio: fecha,
-          estado: 'activa'
+          estado: cuotasPendientesRestantes <= 0 ? 'finalizada' : 'activa'
         });
 
-        // Crear movimientos solo para las cuotas pendientes
-        for (let i = 0; i < cuotasRestantes; i++) {
-          const numeroCuota = parseInt(numeroCuotaActual) + i;
-          await guardarMovimiento({
-            cuentaId,
-            descripcion: `${descripcion} (${numeroCuota}/${cantidadQuotas})`,
-            monto: parseFloat(montoPorCuota),
-            categoria: 'cuota',
-            fecha: new Date(new Date(fecha).getTime() + i * 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
-            esCuota: true,
-            cuotaId,
-            esDebito: false
-          });
-        }
+        // Solo crear UN movimiento para la cuota ACTUAL
+        // Las cuotas futuras se generarán automáticamente al cerrar cada período
+        await guardarMovimiento({
+          cuentaId,
+          descripcion: `${descripcion} (${cuotaActualNum}/${totalCuotas})`,
+          monto: parseFloat(montoPorCuota),
+          categoria: 'cuota',
+          fecha,
+          esCuota: true,
+          cuotaId,
+          esDebito: false
+        });
       }
       setModal(null);
     };

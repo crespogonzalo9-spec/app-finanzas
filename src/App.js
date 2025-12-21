@@ -491,65 +491,57 @@ const MonityApp = () => {
   const cuentasContables = cuentas.filter(c => c.tipo === 'contable');
   const totalIngresos = cuentasIngreso.reduce((s, c) => s + (c.montoMensual || 0), 0);
   
-  const calcularSaldo = (id) => {
-    // Calcular consumos totales de la cuenta (sin importar período)
-    const consumosTotales = movimientos
-      .filter(m => m.cuentaId === id && !m.esSaldoAnterior)
-      .reduce((s, m) => s + (m.monto || 0), 0);
-    
-    // Calcular pagos totales de la cuenta
-    const pagosTotales = pagos
-      .filter(p => p.cuentaId === id)
-      .reduce((s, p) => s + (p.monto || 0), 0);
-    
-    return consumosTotales - pagosTotales;
-  };
+  // NUEVA LÓGICA: Separar DEUDA (períodos vencidos) de CONSUMOS (período actual)
   
-  // Calcular deuda por cuenta (igual a calcularSaldo pero solo positivos)
-  const calcularDeudaPorCuenta = (cuentaId) => {
-    return Math.max(0, calcularSaldo(cuentaId));
+  // Obtener deuda acumulada de una cuenta (lo que quedó sin pagar de períodos anteriores)
+  const obtenerDeudaAcumulada = (cuentaId) => {
+    const cuenta = cuentas.find(c => c.id === cuentaId);
+    return cuenta?.deudaAcumulada || 0;
   };
 
-  // Obtener deudas detalladas por cuenta
-  const obtenerDetalleDeudas = () => {
-    return cuentasContables
-      .map(cuenta => {
-        const deuda = calcularDeudaPorCuenta(cuenta.id);
-        const consumos = movimientos
-          .filter(m => m.cuentaId === cuenta.id && !m.esSaldoAnterior)
-          .reduce((s, m) => s + (m.monto || 0), 0);
-        const pagosTotal = pagos
-          .filter(p => p.cuentaId === cuenta.id)
-          .reduce((s, p) => s + (p.monto || 0), 0);
-        
-        return {
-          id: cuenta.id,
-          nombre: cuenta.nombre,
-          entidad: cuenta.entidad,
-          tipoCuenta: cuenta.tipoCuenta,
-          deuda: deuda,
-          consumos: consumos,
-          pagos: pagosTotal
-        };
-      })
-      .filter(c => c.deuda > 0);
-  };
-
-  // Total de deudas (suma de todas las cuentas)
-  const totalDeudas = cuentasContables.reduce((s, c) => s + calcularDeudaPorCuenta(c.id), 0);
-  
-  // Calcular total de consumos (en tiempo real)
-  const calcularTotalConsumos = () => {
+  // Calcular consumos del período actual (solo movimientos, sin contar deuda anterior)
+  const calcularConsumosPeriodo = (cuentaId) => {
     return movimientos
-      .filter(m => !m.esSaldoAnterior)
+      .filter(m => m.cuentaId === cuentaId && !m.esSaldoAnterior)
       .reduce((s, m) => s + (m.monto || 0), 0);
   };
 
-  // Calcular total de pagos (en tiempo real)
-  const calcularTotalPagos = () => {
-    return pagos.reduce((s, p) => s + (p.monto || 0), 0);
+  // Calcular pagos del período actual (los que NO son para deuda)
+  const calcularPagosPeriodo = (cuentaId) => {
+    return pagos
+      .filter(p => p.cuentaId === cuentaId && !p.esParaDeuda)
+      .reduce((s, p) => s + (p.monto || 0), 0);
   };
 
+  // Calcular pagos de deuda (los que SÍ son para deuda anterior)
+  const calcularPagosDeuda = (cuentaId) => {
+    return pagos
+      .filter(p => p.cuentaId === cuentaId && p.esParaDeuda)
+      .reduce((s, p) => s + (p.monto || 0), 0);
+  };
+
+  // Saldo a pagar del período actual = Consumos - Pagos del período
+  const calcularSaldoPeriodo = (cuentaId) => {
+    return calcularConsumosPeriodo(cuentaId) - calcularPagosPeriodo(cuentaId);
+  };
+
+  // Deuda real = Deuda acumulada - Pagos de deuda
+  const calcularDeudaReal = (cuentaId) => {
+    return Math.max(0, obtenerDeudaAcumulada(cuentaId) - calcularPagosDeuda(cuentaId));
+  };
+
+  // Saldo total de la cuenta = Deuda + Saldo del período
+  const calcularSaldo = (cuentaId) => {
+    return calcularDeudaReal(cuentaId) + calcularSaldoPeriodo(cuentaId);
+  };
+
+  // Total de DEUDA (solo períodos vencidos no pagados)
+  const totalDeudas = cuentasContables.reduce((s, c) => s + calcularDeudaReal(c.id), 0);
+  
+  // Total de CONSUMOS del período actual
+  const totalConsumosPeriodo = cuentasContables.reduce((s, c) => s + calcularConsumosPeriodo(c.id), 0);
+
+  // Saldo disponible = Ingresos - Deuda acumulada
   const calcularSaldoDisponible = () => {
     return totalIngresos - totalDeudas;
   };
@@ -572,46 +564,56 @@ const MonityApp = () => {
 
   const Dashboard = () => (
     <div className="space-y-6">
-      {/* TARJETAS DE RESUMEN - PUNTO 3 */}
+      {/* TARJETAS DE RESUMEN */}
       <div className="grid grid-cols-2 gap-4">
         <div className={`p-4 rounded-2xl ${darkMode ? 'bg-emerald-900' : 'bg-emerald-50'}`}>
           <div className={`text-sm font-medium ${darkMode ? 'text-emerald-200' : 'text-emerald-700'}`}>Ingresos</div>
           <div className={`text-2xl font-bold ${darkMode ? 'text-emerald-300' : 'text-emerald-600'}`}>{formatCurrency(totalIngresos)}</div>
         </div>
-        <button onClick={() => setModal('detalleDeudas')} className={`p-4 rounded-2xl cursor-pointer transition-all hover:shadow-lg ${darkMode ? 'bg-rose-900 hover:bg-rose-800' : 'bg-rose-50 hover:bg-rose-100'}`}>
-          <div className={`text-sm font-medium ${darkMode ? 'text-rose-200' : 'text-rose-700'}`}>Deudas</div>
+        <button onClick={() => setModal('detalleDeudas')} className={`p-4 rounded-2xl cursor-pointer transition-all hover:shadow-lg text-left ${darkMode ? 'bg-rose-900 hover:bg-rose-800' : 'bg-rose-50 hover:bg-rose-100'}`}>
+          <div className={`text-sm font-medium ${darkMode ? 'text-rose-200' : 'text-rose-700'}`}>Deuda Vencida</div>
           <div className={`text-2xl font-bold ${darkMode ? 'text-rose-300' : 'text-rose-600'}`}>{formatCurrency(totalDeudas)}</div>
-          <div className={`text-xs mt-2 ${darkMode ? 'text-rose-300' : 'text-rose-600'}`}>Toca para ver detalle</div>
+          <div className={`text-xs ${darkMode ? 'text-rose-300' : 'text-rose-600'}`}>Períodos anteriores</div>
         </button>
         <div className={`p-4 rounded-2xl ${darkMode ? 'bg-amber-900' : 'bg-amber-50'}`}>
-          <div className={`text-sm font-medium ${darkMode ? 'text-amber-200' : 'text-amber-700'}`}>Total Consumos</div>
-          <div className={`text-2xl font-bold ${darkMode ? 'text-amber-300' : 'text-amber-600'}`}>{formatCurrency(calcularTotalConsumos())}</div>
+          <div className={`text-sm font-medium ${darkMode ? 'text-amber-200' : 'text-amber-700'}`}>Consumos Período</div>
+          <div className={`text-2xl font-bold ${darkMode ? 'text-amber-300' : 'text-amber-600'}`}>{formatCurrency(totalConsumosPeriodo)}</div>
+          <div className={`text-xs ${darkMode ? 'text-amber-300' : 'text-amber-700'}`}>Período actual</div>
         </div>
         <div className={`p-4 rounded-2xl ${darkMode ? 'bg-blue-900' : 'bg-blue-50'}`}>
           <div className={`text-sm font-medium ${darkMode ? 'text-blue-200' : 'text-blue-700'}`}>Saldo Disponible</div>
-          <div className={`text-2xl font-bold ${darkMode ? 'text-blue-300' : 'text-blue-600'}`}>{formatCurrency(calcularSaldoDisponible())}</div>
+          <div className={`text-2xl font-bold ${calcularSaldoDisponible() >= 0 ? (darkMode ? 'text-blue-300' : 'text-blue-600') : 'text-rose-500'}`}>{formatCurrency(calcularSaldoDisponible())}</div>
         </div>
       </div>
 
-      {/* BOTONES DE CONSUMO Y PAGO - MANTIENEN LA FUNCIONALIDAD ORIGINAL */}
+      {/* BOTONES DE CONSUMO Y PAGO */}
       <div className="grid grid-cols-2 gap-4">
         <button onClick={() => setModal('consumo')} className="flex items-center justify-center gap-2 p-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl font-medium shadow-lg"><Minus className="w-5 h-5" /> Consumo</button>
         <button onClick={() => setModal('pago')} className="flex items-center justify-center gap-2 p-4 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl font-medium shadow-lg"><Plus className="w-5 h-5" /> Pago</button>
       </div>
 
-      {/* CUOTAS ACTIVAS */}
+      {/* CUOTAS ACTIVAS - Mejorado */}
       {cuotas.filter(c => c.estado === 'activa').length > 0 && (
         <div className={`border rounded-xl p-4 ${theme.card}`}>
           <h3 className={`font-semibold mb-3 flex items-center gap-2 ${theme.text}`}><Repeat className="w-5 h-5 text-purple-500" /> Cuotas Activas</h3>
           <div className="space-y-2">
-            {cuotas.filter(c => c.estado === 'activa').map(c => (
-              <div key={c.id} className={`flex justify-between items-center p-2 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-slate-50'}`}>
-                <div className="flex-1"><p className={`font-medium text-sm ${theme.text}`}>{c.descripcion}</p><p className={`text-xs ${theme.textMuted}`}>{c.cuotasTotales - c.cuotasPendientes}/{c.cuotasTotales}</p></div>
-                <p className="font-semibold text-purple-500 mr-2">{formatCurrency(c.montoCuota)}</p>
-                <button onClick={() => { setCuotaEditar(c); setModal('editar-cuota'); }} className="p-1 text-blue-500"><Edit3 className="w-4 h-4" /></button>
-                <button onClick={() => { if(window.confirm('¿Eliminar?')) eliminarCuota(c.id); }} className="p-1 text-red-500"><Trash2 className="w-4 h-4" /></button>
-              </div>
-            ))}
+            {cuotas.filter(c => c.estado === 'activa').map(c => {
+              const cuotaActual = c.cuotasTotales - c.cuotasPendientes;
+              const proximaCuota = cuotaActual + 1;
+              return (
+                <div key={c.id} className={`flex justify-between items-center p-3 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-slate-50'}`}>
+                  <div className="flex-1">
+                    <p className={`font-medium text-sm ${theme.text}`}>{c.descripcion}</p>
+                    <p className={`text-xs ${theme.textMuted}`}>
+                      Próxima: cuota {proximaCuota} de {c.cuotasTotales} • Restan {c.cuotasPendientes}
+                    </p>
+                  </div>
+                  <p className="font-semibold text-purple-500 mr-2">{formatCurrency(c.montoCuota)}</p>
+                  <button onClick={() => { setCuotaEditar(c); setModal('editar-cuota'); }} className="p-1 text-blue-500"><Edit3 className="w-4 h-4" /></button>
+                  <button onClick={() => { if(window.confirm('¿Eliminar?')) eliminarCuota(c.id); }} className="p-1 text-red-500"><Trash2 className="w-4 h-4" /></button>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -625,33 +627,46 @@ const MonityApp = () => {
           </button>
         </div>
         <div className="space-y-3">
-          {cuentasContables.map(c => (
-            <div key={c.id} onClick={() => { setCuentaActiva(c); setTab('detalle'); }} className={`p-4 rounded-2xl border cursor-pointer transition-all ${theme.border} ${theme.card} hover:shadow-lg`}>
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <EntidadLogo entidad={c.entidad} size={40} />
-                  <div>
-                    <div className={`font-semibold ${theme.text}`}>{c.nombre}</div>
-                    <div className={`text-xs ${theme.textMuted}`}>{c.tipo}</div>
+          {cuentasContables.map(c => {
+            const deudaC = calcularDeudaReal(c.id);
+            const consumosC = calcularConsumosPeriodo(c.id);
+            const pagosC = calcularPagosPeriodo(c.id);
+            const saldoPeriodoC = consumosC - pagosC;
+            return (
+              <div key={c.id} onClick={() => { setCuentaActiva(c); setTab('detalle'); }} className={`p-4 rounded-2xl border cursor-pointer transition-all ${theme.border} ${theme.card} hover:shadow-lg`}>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-3">
+                    <EntidadLogo entidad={c.entidad} size={40} />
+                    <div>
+                      <div className={`font-semibold ${theme.text}`}>{c.nombre}</div>
+                      <div className={`text-xs ${theme.textMuted}`}>{TIPOS_CUENTA.find(t => t.id === c.tipoCuenta)?.nombre}</div>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-2">
                   <button onClick={(e) => { e.stopPropagation(); setCuentaEditar(c); setModal('cuenta'); }} className={`p-2 rounded-lg ${theme.hover}`}>
                     <Edit3 className="w-4 h-4" />
                   </button>
-                  <div className={`font-bold ${calcularSaldo(c.id) > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
-                    {formatCurrency(calcularSaldo(c.id))}
+                </div>
+                <div className={`grid grid-cols-3 gap-2 text-xs p-2 rounded-lg mb-2 ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
+                  <div className="text-center">
+                    <div className={theme.textMuted}>Deuda</div>
+                    <div className={`font-bold ${deudaC > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(deudaC)}</div>
+                  </div>
+                  <div className="text-center">
+                    <div className={theme.textMuted}>Período</div>
+                    <div className={`font-bold ${saldoPeriodoC > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>{formatCurrency(saldoPeriodoC)}</div>
+                  </div>
+                  <div className="text-center">
+                    <div className={theme.textMuted}>Total</div>
+                    <div className={`font-bold ${(deudaC + saldoPeriodoC) > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(deudaC + saldoPeriodoC)}</div>
                   </div>
                 </div>
+                <div className={`flex justify-between text-xs ${theme.textMuted}`}>
+                  {c.fechaCierre && <span>Cierre: {formatDateShort(c.fechaCierre)}</span>}
+                  {c.fechaVencimiento && <span>Vence: {formatDateShort(c.fechaVencimiento)}</span>}
+                </div>
               </div>
-              {c.fechaCierre && (
-                <div className={`text-xs ${theme.textMuted} mb-2`}>Cierre: {formatDateFull(c.fechaCierre)}</div>
-              )}
-              {c.fechaVencimiento && (
-                <div className={`text-xs ${theme.textMuted}`}>Vencimiento: {formatDateFull(c.fechaVencimiento)}</div>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
@@ -660,10 +675,13 @@ const MonityApp = () => {
   const DetalleCuenta = () => {
     if (!cuentaActiva) return null;
     const p = periodos.find(p => p.cuentaId === cuentaActiva.id && p.estado === 'abierto');
-    const saldo = calcularSaldo(cuentaActiva.id);
+    const deudaCuenta = calcularDeudaReal(cuentaActiva.id);
+    const consumosCuenta = calcularConsumosPeriodo(cuentaActiva.id);
+    const pagosCuenta = calcularPagosPeriodo(cuentaActiva.id);
+    const saldoPeriodoCuenta = consumosCuenta - pagosCuenta;
+    const saldoTotal = deudaCuenta + saldoPeriodoCuenta;
     const cuotasC = cuotas.filter(c => c.cuentaId === cuentaActiva.id && c.estado === 'activa');
     
-    // Mostrar TODOS los movimientos de la cuenta, no solo los del período
     const todos = [
       ...movimientos.filter(m => m.cuentaId === cuentaActiva.id).map(m => ({ ...m, tipo: 'consumo' })),
       ...pagos.filter(pago => pago.cuentaId === cuentaActiva.id).map(pago => ({ ...pago, tipo: 'pago' }))
@@ -677,24 +695,53 @@ const MonityApp = () => {
           <div className="flex-1"><h2 className={`text-lg font-bold ${theme.text}`}>{cuentaActiva.nombre}</h2><p className={`text-sm ${theme.textMuted}`}>{TIPOS_CUENTA.find(t => t.id === cuentaActiva.tipoCuenta)?.nombre}</p></div>
           <button onClick={() => { if(window.confirm('¿Eliminar esta cuenta y todos sus movimientos?')) { eliminarCuenta(cuentaActiva.id); setCuentaActiva(null); setTab('dashboard'); } }} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-5 h-5" /></button>
         </div>
-        {p && (
-          <div className={`rounded-xl p-4 ${darkMode ? 'bg-gray-800' : 'bg-indigo-50'}`}>
-            <div className="flex justify-between items-center mb-2"><span className={`text-sm ${theme.textMuted}`}>{formatDateShort(p.fechaInicio)} - {formatDateShort(p.fechaCierre)}</span><span className={`text-2xl font-bold ${saldo > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(saldo)}</span></div>
-            <button onClick={() => {
-              const periodo = periodos.find(p => p.cuentaId === cuentaActiva.id && p.estado === 'abierto');
-              setModalCerrarPeriodo({ cuentaId: cuentaActiva.id, periodo });
-            }} className="w-full py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium">Cerrar Período</button>
+
+        {/* Resumen de saldos */}
+        <div className={`rounded-xl p-4 ${darkMode ? 'bg-gray-800' : 'bg-slate-100'}`}>
+          <div className="grid grid-cols-3 gap-3 text-center mb-3">
+            <div>
+              <div className={`text-xs ${theme.textMuted}`}>Deuda Anterior</div>
+              <div className={`text-lg font-bold ${deudaCuenta > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(deudaCuenta)}</div>
+            </div>
+            <div>
+              <div className={`text-xs ${theme.textMuted}`}>Saldo Período</div>
+              <div className={`text-lg font-bold ${saldoPeriodoCuenta > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>{formatCurrency(saldoPeriodoCuenta)}</div>
+            </div>
+            <div>
+              <div className={`text-xs ${theme.textMuted}`}>Total</div>
+              <div className={`text-lg font-bold ${saldoTotal > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(saldoTotal)}</div>
+            </div>
           </div>
-        )}
+          {p && (
+            <div className="pt-3 border-t border-gray-600">
+              <div className="flex justify-between items-center mb-2">
+                <span className={`text-sm ${theme.textMuted}`}>Período: {formatDateShort(p.fechaInicio)} - {formatDateShort(p.fechaCierre)}</span>
+              </div>
+              <button onClick={() => {
+                setModalCerrarPeriodo({ cuentaId: cuentaActiva.id, periodo: p });
+              }} className="w-full py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium">Cerrar Período</button>
+            </div>
+          )}
+        </div>
+
         {cuotasC.length > 0 && (
           <div className={`border rounded-xl p-3 ${theme.card}`}>
             <h4 className={`font-semibold mb-2 text-sm ${theme.text}`}>Cuotas en curso</h4>
-            {cuotasC.map(c => (
-              <div key={c.id} className={`flex items-center justify-between p-2 rounded-lg mb-1 ${darkMode ? 'bg-gray-700' : 'bg-slate-50'}`}>
-                <div><p className={`text-sm ${theme.text}`}>{c.descripcion}</p><p className={`text-xs ${theme.textMuted}`}>{c.cuotasTotales - c.cuotasPendientes}/{c.cuotasTotales} - {formatCurrency(c.montoCuota)}/cuota</p></div>
-                <div className="flex gap-1"><button onClick={() => { setCuotaEditar(c); setModal('editar-cuota'); }} className="p-1 text-blue-500"><Edit3 className="w-4 h-4" /></button><button onClick={() => { if(window.confirm('¿Eliminar?')) eliminarCuota(c.id); }} className="p-1 text-red-500"><Trash2 className="w-4 h-4" /></button></div>
-              </div>
-            ))}
+            {cuotasC.map(c => {
+              const proximaCuota = c.cuotasTotales - c.cuotasPendientes + 1;
+              return (
+                <div key={c.id} className={`flex items-center justify-between p-2 rounded-lg mb-1 ${darkMode ? 'bg-gray-700' : 'bg-slate-50'}`}>
+                  <div>
+                    <p className={`text-sm ${theme.text}`}>{c.descripcion}</p>
+                    <p className={`text-xs ${theme.textMuted}`}>Próxima: {proximaCuota}/{c.cuotasTotales} - {formatCurrency(c.montoCuota)}/cuota</p>
+                  </div>
+                  <div className="flex gap-1">
+                    <button onClick={() => { setCuotaEditar(c); setModal('editar-cuota'); }} className="p-1 text-blue-500"><Edit3 className="w-4 h-4" /></button>
+                    <button onClick={() => { if(window.confirm('¿Eliminar?')) eliminarCuota(c.id); }} className="p-1 text-red-500"><Trash2 className="w-4 h-4" /></button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
         <div>
@@ -703,8 +750,11 @@ const MonityApp = () => {
             <div className={`border rounded-xl divide-y ${theme.card} ${theme.border}`}>
               {todos.map((m, i) => (
                 <div key={m.id + i} className="p-3 flex items-center gap-3">
-                  <span className="text-lg">{m.tipo === 'pago' ? '💰' : m.esCuota ? '🔄' : CATEGORIAS.find(c => c.id === m.categoria)?.icon || '📦'}</span>
-                  <div className="flex-1 min-w-0"><p className={`font-medium text-sm truncate ${theme.text}`}>{m.descripcion}</p><p className={`text-xs ${theme.textMuted}`}>{formatDateShort(m.fecha)}</p></div>
+                  <span className="text-lg">{m.tipo === 'pago' ? (m.esParaDeuda ? '🏦' : '💰') : m.esCuota ? '🔄' : CATEGORIAS.find(c => c.id === m.categoria)?.icon || '📦'}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className={`font-medium text-sm truncate ${theme.text}`}>{m.descripcion}</p>
+                    <p className={`text-xs ${theme.textMuted}`}>{formatDateShort(m.fecha)} {m.tipo === 'pago' && m.esParaDeuda && '• Pago deuda'}</p>
+                  </div>
                   <p className={`font-semibold ${m.tipo === 'pago' ? 'text-emerald-500' : 'text-rose-500'}`}>{m.tipo === 'pago' ? '+' : '-'}{formatCurrency(m.monto)}</p>
                   {m.tipo === 'consumo' && !m.esSaldoAnterior && (
                     <div className="flex gap-1"><button onClick={() => { setMovimientoEditar(m); setModal('editar-mov'); }} className="p-1 text-blue-500"><Edit3 className="w-3 h-3" /></button><button onClick={() => { if(window.confirm('¿Eliminar?')) eliminarMovimiento(m.id); }} className="p-1 text-red-500"><Trash2 className="w-3 h-3" /></button></div>
@@ -967,19 +1017,84 @@ const MonityApp = () => {
     const [descripcion, setDescripcion] = useState('');
     const [monto, setMonto] = useState('');
     const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
-    const saldo = cuentaId ? calcularSaldo(cuentaId) : 0;
+    const [tipoPago, setTipoPago] = useState('periodo'); // 'periodo' o 'deuda'
+    
+    const deudaCuenta = cuentaId ? calcularDeudaReal(cuentaId) : 0;
+    const saldoPeriodoCuenta = cuentaId ? calcularSaldoPeriodo(cuentaId) : 0;
+    const totalCuenta = deudaCuenta + saldoPeriodoCuenta;
+    
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <div className={`rounded-2xl w-full max-w-lg ${theme.card}`}>
+        <div className={`rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto ${theme.card}`}>
           <div className={`p-4 border-b flex justify-between ${theme.border}`}><h3 className={`font-bold ${theme.text}`}>Cargar Pago</h3><button onClick={() => setModal(null)}><X className={`w-5 h-5 ${theme.text}`} /></button></div>
           <div className="p-4 space-y-4">
-            <select value={cuentaId} onChange={e => setCuentaId(e.target.value)} className={`w-full p-3 border rounded-xl ${theme.input}`}><option value="">Cuenta...</option>{cuentasContables.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}</select>
-            {cuentaId && <div className={`p-3 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-blue-50'}`}><span className={theme.textMuted}>Saldo: </span><span className={`font-bold ${saldo > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(saldo)}</span></div>}
-            <input type="text" value={descripcion} onChange={e => setDescripcion(e.target.value)} placeholder="Descripción" className={`w-full p-3 border rounded-xl ${theme.input}`} />
+            <select value={cuentaId} onChange={e => setCuentaId(e.target.value)} className={`w-full p-3 border rounded-xl ${theme.input}`}>
+              <option value="">Seleccionar cuenta...</option>
+              {cuentasContables.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+            </select>
+            
+            {cuentaId && (
+              <>
+                {/* Resumen de la cuenta */}
+                <div className={`p-3 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
+                  <div className="grid grid-cols-3 gap-2 text-center text-sm">
+                    <div>
+                      <div className={theme.textMuted}>Deuda</div>
+                      <div className={`font-bold ${deudaCuenta > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(deudaCuenta)}</div>
+                    </div>
+                    <div>
+                      <div className={theme.textMuted}>Período</div>
+                      <div className={`font-bold ${saldoPeriodoCuenta > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>{formatCurrency(saldoPeriodoCuenta)}</div>
+                    </div>
+                    <div>
+                      <div className={theme.textMuted}>Total</div>
+                      <div className={`font-bold ${totalCuenta > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(totalCuenta)}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tipo de pago */}
+                <div className={`p-3 rounded-xl border-2 ${tipoPago === 'deuda' ? 'border-rose-500' : 'border-blue-500'} ${darkMode ? 'bg-gray-700' : 'bg-slate-50'}`}>
+                  <p className={`text-sm font-semibold mb-3 ${theme.text}`}>¿A qué corresponde este pago?</p>
+                  <div className="space-y-2">
+                    <label className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer ${tipoPago === 'periodo' ? (darkMode ? 'bg-blue-900' : 'bg-blue-100') : ''}`}>
+                      <input type="radio" checked={tipoPago === 'periodo'} onChange={() => setTipoPago('periodo')} className="w-4 h-4" />
+                      <div>
+                        <span className={`font-medium ${theme.text}`}>Pago del período actual</span>
+                        <p className={`text-xs ${theme.textMuted}`}>Para consumos de este mes</p>
+                      </div>
+                    </label>
+                    <label className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer ${tipoPago === 'deuda' ? (darkMode ? 'bg-rose-900' : 'bg-rose-100') : ''} ${deudaCuenta <= 0 ? 'opacity-50' : ''}`}>
+                      <input type="radio" checked={tipoPago === 'deuda'} onChange={() => setTipoPago('deuda')} disabled={deudaCuenta <= 0} className="w-4 h-4" />
+                      <div>
+                        <span className={`font-medium ${theme.text}`}>Pago de deuda anterior</span>
+                        <p className={`text-xs ${theme.textMuted}`}>Para períodos vencidos ({formatCurrency(deudaCuenta)})</p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              </>
+            )}
+            
+            <input type="text" value={descripcion} onChange={e => setDescripcion(e.target.value)} placeholder="Descripción (opcional)" className={`w-full p-3 border rounded-xl ${theme.input}`} />
             <input type="number" value={monto} onChange={e => setMonto(e.target.value)} placeholder="Monto" className={`w-full p-3 border rounded-xl ${theme.input}`} />
             <DatePicker label="Fecha" value={fecha} onChange={setFecha} darkMode={darkMode} theme={theme} />
           </div>
-          <div className={`p-4 border-t flex gap-3 ${theme.border}`}><button onClick={() => setModal(null)} className={`flex-1 p-3 border rounded-xl ${theme.border} ${theme.text}`}>Cancelar</button><button onClick={async () => { await guardarPago({ cuentaId, descripcion: descripcion || 'Pago', monto: parseFloat(monto), fecha }); setModal(null); }} disabled={!cuentaId || !monto} className="flex-1 p-3 bg-blue-600 text-white rounded-xl disabled:opacity-50">Registrar</button></div>
+          <div className={`p-4 border-t flex gap-3 ${theme.border}`}>
+            <button onClick={() => setModal(null)} className={`flex-1 p-3 border rounded-xl ${theme.border} ${theme.text}`}>Cancelar</button>
+            <button onClick={async () => { 
+              await guardarPago({ 
+                cuentaId, 
+                descripcion: descripcion || (tipoPago === 'deuda' ? 'Pago deuda' : 'Pago período'), 
+                monto: parseFloat(monto), 
+                fecha,
+                esParaDeuda: tipoPago === 'deuda'
+              }); 
+              setModal(null); 
+            }} disabled={!cuentaId || !monto} className={`flex-1 p-3 text-white rounded-xl disabled:opacity-50 ${tipoPago === 'deuda' ? 'bg-rose-600' : 'bg-blue-600'}`}>
+              {tipoPago === 'deuda' ? 'Pagar Deuda' : 'Registrar Pago'}
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -1323,19 +1438,22 @@ const MonityApp = () => {
       nombre: cuenta.nombre,
       entidad: cuenta.entidad,
       tipoCuenta: cuenta.tipoCuenta,
-      saldo: calcularSaldo(cuenta.id),
-      consumos: movimientos.filter(m => m.cuentaId === cuenta.id && !m.esSaldoAnterior).reduce((acc, m) => acc + (m.monto || 0), 0),
-      pagos: pagos.filter(p => p.cuentaId === cuenta.id).reduce((acc, p) => acc + (p.monto || 0), 0)
+      deuda: calcularDeudaReal(cuenta.id),
+      consumosPeriodo: calcularConsumosPeriodo(cuenta.id),
+      pagosPeriodo: calcularPagosPeriodo(cuenta.id),
+      pagosDeuda: calcularPagosDeuda(cuenta.id),
+      saldoPeriodo: calcularSaldoPeriodo(cuenta.id)
     }));
 
-    const totalConsumos = todasLasCuentas.reduce((s, c) => s + c.consumos, 0);
-    const totalPagosGlobal = todasLasCuentas.reduce((s, c) => s + c.pagos, 0);
+    const totalDeudaGlobal = todasLasCuentas.reduce((s, c) => s + c.deuda, 0);
+    const totalConsumosPeriodoGlobal = todasLasCuentas.reduce((s, c) => s + c.consumosPeriodo, 0);
+    const totalSaldoPeriodoGlobal = todasLasCuentas.reduce((s, c) => s + c.saldoPeriodo, 0);
 
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
         <div className={`rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col ${theme.card}`}>
           <div className={`p-4 border-b flex justify-between shrink-0 ${theme.border}`}>
-            <h3 className={`font-bold ${theme.text}`}>Resumen por Cuenta</h3>
+            <h3 className={`font-bold ${theme.text}`}>Resumen Financiero</h3>
             <button onClick={() => setModal(null)}><X className={`w-5 h-5 ${theme.text}`} /></button>
           </div>
           
@@ -1352,23 +1470,22 @@ const MonityApp = () => {
                         <div className={`font-semibold text-sm truncate ${theme.text}`}>{cuenta.nombre}</div>
                         <div className={`text-xs ${theme.textMuted}`}>{TIPOS_CUENTA.find(t => t.id === cuenta.tipoCuenta)?.nombre}</div>
                       </div>
-                      <div className={`text-lg font-bold ${cuenta.saldo > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
-                        {formatCurrency(cuenta.saldo)}
+                    </div>
+                    <div className={`grid grid-cols-2 gap-2 text-center text-xs p-2 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
+                      <div>
+                        <div className={theme.textMuted}>Deuda Vencida</div>
+                        <div className={`font-bold ${cuenta.deuda > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(cuenta.deuda)}</div>
+                      </div>
+                      <div>
+                        <div className={theme.textMuted}>Saldo Período</div>
+                        <div className={`font-bold ${cuenta.saldoPeriodo > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>{formatCurrency(cuenta.saldoPeriodo)}</div>
                       </div>
                     </div>
-                    <div className={`grid grid-cols-3 gap-2 text-center text-xs p-2 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
-                      <div>
-                        <div className={theme.textMuted}>Consumos</div>
-                        <div className="font-semibold text-rose-500">{formatCurrency(cuenta.consumos)}</div>
-                      </div>
-                      <div>
-                        <div className={theme.textMuted}>Pagos</div>
-                        <div className="font-semibold text-emerald-500">{formatCurrency(cuenta.pagos)}</div>
-                      </div>
-                      <div>
-                        <div className={theme.textMuted}>Saldo</div>
-                        <div className={`font-semibold ${cuenta.saldo > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(cuenta.saldo)}</div>
-                      </div>
+                    <div className={`mt-2 pt-2 border-t ${theme.border} flex justify-between items-center`}>
+                      <span className={`text-xs ${theme.textMuted}`}>Total a pagar</span>
+                      <span className={`font-bold ${(cuenta.deuda + cuenta.saldoPeriodo) > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                        {formatCurrency(cuenta.deuda + cuenta.saldoPeriodo)}
+                      </span>
                     </div>
                   </div>
                 ))}
@@ -1379,18 +1496,22 @@ const MonityApp = () => {
           {/* Resumen total fijo abajo */}
           <div className={`p-4 border-t shrink-0 ${theme.border}`}>
             <div className={`p-3 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
-              <div className="grid grid-cols-3 gap-2 text-center text-sm mb-2">
-                <div>
-                  <div className={`text-xs ${theme.textMuted}`}>Total Consumos</div>
-                  <div className="font-bold text-rose-500">{formatCurrency(totalConsumos)}</div>
+              <div className="grid grid-cols-2 gap-3 text-center mb-3">
+                <div className={`p-2 rounded-lg ${darkMode ? 'bg-rose-900/50' : 'bg-rose-50'}`}>
+                  <div className={`text-xs ${theme.textMuted}`}>Deuda Vencida</div>
+                  <div className="font-bold text-lg text-rose-500">{formatCurrency(totalDeudaGlobal)}</div>
+                  <div className={`text-xs ${theme.textMuted}`}>Períodos anteriores</div>
                 </div>
-                <div>
-                  <div className={`text-xs ${theme.textMuted}`}>Total Pagos</div>
-                  <div className="font-bold text-emerald-500">{formatCurrency(totalPagosGlobal)}</div>
+                <div className={`p-2 rounded-lg ${darkMode ? 'bg-amber-900/50' : 'bg-amber-50'}`}>
+                  <div className={`text-xs ${theme.textMuted}`}>Consumos Período</div>
+                  <div className="font-bold text-lg text-amber-500">{formatCurrency(totalSaldoPeriodoGlobal)}</div>
+                  <div className={`text-xs ${theme.textMuted}`}>Período actual</div>
                 </div>
-                <div>
-                  <div className={`text-xs ${theme.textMuted}`}>Deuda Total</div>
-                  <div className={`font-bold text-lg ${totalDeudas > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(totalDeudas)}</div>
+              </div>
+              <div className={`p-2 rounded-lg text-center ${darkMode ? 'bg-indigo-900/50' : 'bg-indigo-50'}`}>
+                <div className={`text-xs ${theme.textMuted}`}>TOTAL A PAGAR</div>
+                <div className={`font-bold text-xl ${(totalDeudaGlobal + totalSaldoPeriodoGlobal) > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                  {formatCurrency(totalDeudaGlobal + totalSaldoPeriodoGlobal)}
                 </div>
               </div>
             </div>

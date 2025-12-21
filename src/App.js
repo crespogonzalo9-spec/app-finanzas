@@ -1030,10 +1030,21 @@ const MonityApp = () => {
     );
   };
    const ModalEditarCuota = () => {
-  const [desc, setDesc] = useState(cuotaEditar?.descripcion || '');
-  const [monto, setMonto] = useState(cuotaEditar?.montoCuota?.toString() || '');
-  const [total, setTotal] = useState(cuotaEditar?.cuotasTotales?.toString() || '');
-  const [pend, setPend] = useState(cuotaEditar?.cuotasPendientes?.toString() || '');
+  if (!cuotaEditar) return null;
+
+  const [desc, setDesc] = useState(cuotaEditar.descripcion || '');
+  const [monto, setMonto] = useState(cuotaEditar.montoCuota?.toString() || '');
+  const [total, setTotal] = useState(cuotaEditar.cuotasTotales?.toString() || '');
+  const [pend, setPend] = useState(cuotaEditar.cuotasPendientes?.toString() || '');
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className={`rounded-2xl w-full max-w-lg ${theme.card}`}>
+        {/* CONTENIDO DEL MODAL */}
+      </div>
+    </div>
+  );
+};
 
   if (!cuotaEditar) return null;
 
@@ -1045,115 +1056,116 @@ const MonityApp = () => {
     </div>
   );
   };
-  };
+  
 
   // MODAL PARA CERRAR PERÍODO CON OPCIÓN DE PAGO
-  function ModalCerrarPeriodoConPago() {
-  const cuentaId = modalCerrarPeriodo?.cuentaId;
-  const periodo = modalCerrarPeriodo?.periodo;
+  const ModalCerrarPeriodoConPago = () => {
+    const cuentaId = modalCerrarPeriodo?.cuentaId;
+    const periodo = modalCerrarPeriodo?.periodo;
+    
+    if (!periodo || !cuentaId) return null;
 
-  if (!periodo || !cuentaId) return null;
+    // Calcular valores EN TIEMPO REAL, no usar los del período guardado
+    const consumosDelPeriodo = movimientos
+      .filter(m => m.cuentaId === cuentaId && !m.esCuota && !m.esSaldoAnterior)
+      .reduce((s, m) => s + (m.monto || 0), 0);
+    
+    const cuotasDelPeriodo = movimientos
+      .filter(m => m.cuentaId === cuentaId && m.esCuota)
+      .reduce((s, m) => s + (m.monto || 0), 0);
+    
+    const pagosDelPeriodo = pagos
+      .filter(p => p.cuentaId === cuentaId)
+      .reduce((s, p) => s + (p.monto || 0), 0);
+    
+    const saldoInicial = periodo.saldoInicial || 0;
+    const totalConsumos = consumosDelPeriodo;
+    const totalCuotas = cuotasDelPeriodo;
+    const totalPagos = pagosDelPeriodo;
+    const saldoPendiente = saldoInicial + totalConsumos + totalCuotas - totalPagos;
 
-  // Calcular valores EN TIEMPO REAL, no usar los del período guardado
-  const consumosDelPeriodo = movimientos
-    .filter(m => m.cuentaId === cuentaId && !m.esCuota && !m.esSaldoAnterior)
-    .reduce((s, m) => s + (m.monto || 0), 0);
+    const montoPagoNum = parseFloat(pagoAlCerrar) || 0;
+    const saldoAlProximoPeriodo = Math.max(0, saldoPendiente - montoPagoNum);
 
-  const cuotasDelPeriodo = movimientos
-    .filter(m => m.cuentaId === cuentaId && m.esCuota)
-    .reduce((s, m) => s + (m.monto || 0), 0);
-
-  const pagosDelPeriodo = pagos
-    .filter(p => p.cuentaId === cuentaId)
-    .reduce((s, p) => s + (p.monto || 0), 0);
-
-  const saldoInicial = periodo.saldoInicial || 0;
-  const totalConsumos = consumosDelPeriodo;
-  const totalCuotas = cuotasDelPeriodo;
-  const totalPagos = pagosDelPeriodo;
-  const saldoPendiente = saldoInicial + totalConsumos + totalCuotas - totalPagos;
-
-  const montoPagoNum = parseFloat(pagoAlCerrar) || 0;
-  const saldoAlProximoPeriodo = Math.max(0, saldoPendiente - montoPagoNum);
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-      <div className={`rounded-2xl w-full max-w-lg my-4 ${theme.card}`}>
-        <div className={`p-4 border-b flex justify-between ${theme.border}`}>
-          <h3 className={`font-bold ${theme.text}`}>Cerrar Período</h3>
-          <button onClick={() => { setModalCerrarPeriodo(null); setPagoAlCerrar(''); } }><X className={`w-5 h-5 ${theme.text}`} /></button>
-        </div>
-        <div className="p-4 space-y-4">
-          {/* Resumen del período */}
-          <div className={`p-4 rounded-2xl ${darkMode ? 'bg-gray-700' : 'bg-slate-50'}`}>
-            <h4 className={`font-semibold ${theme.text} mb-3`}>Resumen del Período</h4>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className={theme.textMuted}>Saldo Inicial:</span>
-                <span className={`font-semibold ${theme.text}`}>{formatCurrency(saldoInicial)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className={theme.textMuted}>Consumos:</span>
-                <span className={`font-semibold text-rose-500`}>{formatCurrency(totalConsumos)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className={theme.textMuted}>Cuotas:</span>
-                <span className={`font-semibold text-rose-500`}>{formatCurrency(totalCuotas)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className={theme.textMuted}>Pagos:</span>
-                <span className={`font-semibold text-emerald-500`}>{formatCurrency(totalPagos)}</span>
-              </div>
-              <div className={`border-t ${theme.border} pt-2 mt-2 flex justify-between`}>
-                <span className={`font-semibold ${theme.text}`}>Saldo Pendiente:</span>
-                <span className={`text-lg font-bold ${saldoPendiente > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(saldoPendiente)}</span>
-              </div>
-            </div>
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+        <div className={`rounded-2xl w-full max-w-lg my-4 ${theme.card}`}>
+          <div className={`p-4 border-b flex justify-between ${theme.border}`}>
+            <h3 className={`font-bold ${theme.text}`}>Cerrar Período</h3>
+            <button onClick={() => { setModalCerrarPeriodo(null); setPagoAlCerrar(''); }}><X className={`w-5 h-5 ${theme.text}`} /></button>
           </div>
-
-          {/* Pregunta de pago */}
-          <div className={`p-4 rounded-2xl border-2 border-amber-500 ${darkMode ? 'bg-amber-900/20' : 'bg-amber-50'}`}>
-            <p className={`text-sm font-semibold ${theme.text} mb-3`}>¿Desea realizar un pago al cerrar este período?</p>
-            <div className="space-y-3">
-              <div>
-                <label className={`text-xs ${theme.textMuted}`}>Monto a Pagar (opcional)</label>
-                <input
-                  type="number"
-                  value={pagoAlCerrar}
-                  onChange={e => setPagoAlCerrar(e.target.value)}
-                  placeholder="0"
-                  className={`w-full p-3 border rounded-xl ${theme.input}`} />
-              </div>
-
-              {montoPagoNum > 0 && (
-                <div className={`p-3 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-blue-50'}`}>
-                  <div className="flex justify-between mb-2 text-sm">
-                    <span className={theme.textMuted}>Saldo Pendiente:</span>
-                    <span className={`font-semibold ${theme.text}`}>{formatCurrency(saldoPendiente)}</span>
-                  </div>
-                  <div className="flex justify-between mb-2 text-sm">
-                    <span className={theme.textMuted}>Pago Realizado:</span>
-                    <span className={`font-semibold text-emerald-500`}>{formatCurrency(montoPagoNum)}</span>
-                  </div>
-                  <div className={`border-t ${theme.border} pt-2 flex justify-between text-sm`}>
-                    <span className={`font-semibold ${theme.text}`}>Saldo al Próximo Período:</span>
-                    <span className={`text-base font-bold ${saldoAlProximoPeriodo > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
-                      {formatCurrency(saldoAlProximoPeriodo)}
-                    </span>
-                  </div>
+          <div className="p-4 space-y-4">
+            {/* Resumen del período */}
+            <div className={`p-4 rounded-2xl ${darkMode ? 'bg-gray-700' : 'bg-slate-50'}`}>
+              <h4 className={`font-semibold ${theme.text} mb-3`}>Resumen del Período</h4>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className={theme.textMuted}>Saldo Inicial:</span>
+                  <span className={`font-semibold ${theme.text}`}>{formatCurrency(saldoInicial)}</span>
                 </div>
-              )}
+                <div className="flex justify-between">
+                  <span className={theme.textMuted}>Consumos:</span>
+                  <span className={`font-semibold text-rose-500`}>{formatCurrency(totalConsumos)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className={theme.textMuted}>Cuotas:</span>
+                  <span className={`font-semibold text-rose-500`}>{formatCurrency(totalCuotas)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className={theme.textMuted}>Pagos:</span>
+                  <span className={`font-semibold text-emerald-500`}>{formatCurrency(totalPagos)}</span>
+                </div>
+                <div className={`border-t ${theme.border} pt-2 mt-2 flex justify-between`}>
+                  <span className={`font-semibold ${theme.text}`}>Saldo Pendiente:</span>
+                  <span className={`text-lg font-bold ${saldoPendiente > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(saldoPendiente)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Pregunta de pago */}
+            <div className={`p-4 rounded-2xl border-2 border-amber-500 ${darkMode ? 'bg-amber-900/20' : 'bg-amber-50'}`}>
+              <p className={`text-sm font-semibold ${theme.text} mb-3`}>¿Desea realizar un pago al cerrar este período?</p>
+              <div className="space-y-3">
+                <div>
+                  <label className={`text-xs ${theme.textMuted}`}>Monto a Pagar (opcional)</label>
+                  <input 
+                    type="number" 
+                    value={pagoAlCerrar}
+                    onChange={e => setPagoAlCerrar(e.target.value)}
+                    placeholder="0"
+                    className={`w-full p-3 border rounded-xl ${theme.input}`}
+                  />
+                </div>
+                
+                {montoPagoNum > 0 && (
+                  <div className={`p-3 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-blue-50'}`}>
+                    <div className="flex justify-between mb-2 text-sm">
+                      <span className={theme.textMuted}>Saldo Pendiente:</span>
+                      <span className={`font-semibold ${theme.text}`}>{formatCurrency(saldoPendiente)}</span>
+                    </div>
+                    <div className="flex justify-between mb-2 text-sm">
+                      <span className={theme.textMuted}>Pago Realizado:</span>
+                      <span className={`font-semibold text-emerald-500`}>{formatCurrency(montoPagoNum)}</span>
+                    </div>
+                    <div className={`border-t ${theme.border} pt-2 flex justify-between text-sm`}>
+                      <span className={`font-semibold ${theme.text}`}>Saldo al Próximo Período:</span>
+                      <span className={`text-base font-bold ${saldoAlProximoPeriodo > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                        {formatCurrency(saldoAlProximoPeriodo)}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-        <div className={`p-4 border-t flex gap-3 ${theme.border}`}>
-          <button onClick={() => { setModalCerrarPeriodo(null); setPagoAlCerrar(''); } } className={`flex-1 p-3 border rounded-xl ${theme.border} ${theme.text}`}>Cancelar</button>
-          <button onClick={() => cerrarPeriodo(cuentaId, montoPagoNum)} className="flex-1 p-3 bg-blue-600 text-white rounded-xl font-medium">Cerrar Período</button>
+          <div className={`p-4 border-t flex gap-3 ${theme.border}`}>
+            <button onClick={() => { setModalCerrarPeriodo(null); setPagoAlCerrar(''); }} className={`flex-1 p-3 border rounded-xl ${theme.border} ${theme.text}`}>Cancelar</button>
+            <button onClick={() => cerrarPeriodo(cuentaId, montoPagoNum)} className="flex-1 p-3 bg-blue-600 text-white rounded-xl font-medium">Cerrar Período</button>
+          </div>
         </div>
       </div>
-    </div>
-  );
-}
+    );
+  };
 
   // MODAL PARA GESTIONAR DÉBITOS AUTOMÁTICOS
   const ModalDebitosAutomaticos = () => {

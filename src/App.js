@@ -127,6 +127,9 @@ const MonityApp = () => {
   const [cuotaEditar, setCuotaEditar] = useState(null);
   const [cuentaEditar, setCuentaEditar] = useState(null);
   const [config, setConfig] = useState({ alertaGastoAlto: false, montoAlertaGasto: 10000, alertaPorcentaje: false, porcentajeAlerta: 80 });
+  const [versionActual, setVersionActual] = useState('1.0.0');
+  const [actualizacionDisponible, setActualizacionDisponible] = useState(false);
+  const [ultimaVerificacion, setUltimaVerificacion] = useState(null);
 
   const theme = {
     bg: darkMode ? 'bg-gray-900' : 'bg-slate-50',
@@ -150,6 +153,72 @@ const MonityApp = () => {
     });
     return () => unsubscribe();
   }, []);
+
+  // SOLUCIÓN 1 Y 2: Verificar actualizaciones
+  useEffect(() => {
+    // Verificar actualizaciones cada vez que la app se abre
+    verificarActualizacion();
+
+    // SOLUCIÓN 2: Verificar en background cada 6 horas
+    const intervalo = setInterval(() => {
+      verificarActualizacion();
+    }, 6 * 60 * 60 * 1000); // 6 horas
+
+    return () => clearInterval(intervalo);
+  }, []);
+
+  const verificarActualizacion = async () => {
+    try {
+      // Intentar obtener la versión del servidor
+      // Usamos un archivo version.json o un endpoint
+      const response = await fetch('/version.json?t=' + Date.now());
+      
+      if (response.ok) {
+        const versionData = await response.json();
+        const versionServidor = versionData.version || '1.0.0';
+        
+        setUltimaVerificacion(new Date());
+        
+        // Comparar versiones
+        if (versionServidor !== versionActual) {
+          setActualizacionDisponible(true);
+          setVersionActual(versionServidor);
+          
+          // Guardar que hay actualización disponible
+          if (user) {
+            try {
+              await setDoc(doc(db, 'users', user.uid, 'config', 'general'), 
+                { ultimaActualizacionDisponible: new Date().toISOString() }, 
+                { merge: true }
+              );
+            } catch (e) {
+              console.log('No se pudo guardar fecha de actualización');
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // Si no puede conectar o no existe el archivo, es normal
+      console.log('No se pudo verificar actualización:', e.message);
+    }
+  };
+
+  const aplicarActualizacion = () => {
+    // Limpiar el cache y recargar
+    if ('caches' in window) {
+      caches.keys().then(cacheNames => {
+        cacheNames.forEach(cacheName => {
+          caches.delete(cacheName);
+        });
+      });
+    }
+
+    // Limpiar localStorage si es necesario
+    sessionStorage.clear();
+
+    // Recargar la página
+    window.location.href = window.location.href;
+  };
 
   const cargarDatos = async (uid) => {
     setDataLoading(true);
@@ -333,25 +402,48 @@ const MonityApp = () => {
     return (p.saldoInicial || 0) + c.reduce((s, m) => s + m.monto, 0) - pg.reduce((s, x) => s + x.monto, 0);
   };
   
-  // NUEVA FUNCIÓN: Calcular deuda por cuenta (consumos - pagos de esa cuenta)
+  // NUEVA FUNCIÓN: Calcular deuda por cuenta (consumos período actual - pagos período actual)
   const calcularDeudaPorCuenta = (cuentaId) => {
-    const consumos = movimientos.filter(m => m.cuentaId === cuentaId).reduce((acc, m) => acc + (m.monto || 0), 0);
-    const pagosCuenta = pagos.filter(p => p.cuentaId === cuentaId).reduce((acc, p) => acc + (p.monto || 0), 0);
+    const periodo = periodos.find(p => p.cuentaId === cuentaId && p.estado === 'abierto');
+    if (!periodo) return 0;
+    
+    const consumos = movimientos
+      .filter(m => m.cuentaId === cuentaId && m.fecha >= periodo.fechaInicio && m.fecha <= periodo.fechaCierre)
+      .reduce((acc, m) => acc + (m.monto || 0), 0);
+    
+    const pagosCuenta = pagos
+      .filter(p => p.cuentaId === cuentaId && p.fecha >= periodo.fechaInicio && p.fecha <= periodo.fechaCierre)
+      .reduce((acc, p) => acc + (p.monto || 0), 0);
+    
     const deuda = consumos - pagosCuenta;
     return Math.max(0, deuda); // No mostrar deudas negativas
   };
 
   // NUEVA FUNCIÓN: Obtener deudas detalladas por cuenta
   const obtenerDetalleDeudas = () => {
-    return cuentasContables.map(cuenta => ({
-      id: cuenta.id,
-      nombre: cuenta.nombre,
-      entidad: cuenta.entidad,
-      tipoCuenta: cuenta.tipoCuenta,
-      deuda: calcularDeudaPorCuenta(cuenta.id),
-      consumos: movimientos.filter(m => m.cuentaId === cuenta.id).reduce((acc, m) => acc + (m.monto || 0), 0),
-      pagos: pagos.filter(p => p.cuentaId === cuenta.id).reduce((acc, p) => acc + (p.monto || 0), 0)
-    })).filter(c => c.deuda > 0); // Solo mostrar las que tienen deuda
+    return cuentasContables.map(cuenta => {
+      const periodo = periodos.find(p => p.cuentaId === cuenta.id && p.estado === 'abierto');
+      if (!periodo) return null;
+      
+      const consumos = movimientos
+        .filter(m => m.cuentaId === cuenta.id && m.fecha >= periodo.fechaInicio && m.fecha <= periodo.fechaCierre)
+        .reduce((acc, m) => acc + (m.monto || 0), 0);
+      
+      const pagosCuenta = pagos
+        .filter(p => p.cuentaId === cuenta.id && p.fecha >= periodo.fechaInicio && p.fecha <= periodo.fechaCierre)
+        .reduce((acc, p) => acc + (p.monto || 0), 0);
+      
+      return {
+        id: cuenta.id,
+        nombre: cuenta.nombre,
+        entidad: cuenta.entidad,
+        tipoCuenta: cuenta.tipoCuenta,
+        deuda: consumos - pagosCuenta,
+        consumos: consumos,
+        pagos: pagosCuenta
+      };
+    })
+    .filter(c => c !== null && c.deuda > 0); // Solo mostrar las que tienen deuda
   };
 
   // Total de deudas (suma de todas las cuentas)
@@ -939,6 +1031,53 @@ const MonityApp = () => {
           <div className={`font-semibold ${theme.text}`}>Gestionar Débitos Automáticos</div>
           <div className={`text-sm ${theme.textMuted}`}>{debitosAutomaticos.length} débitos activos</div>
         </button>
+        {ultimaVerificacion && (
+          <div className={`p-3 rounded-2xl text-xs ${theme.textMuted}`}>
+            Última verificación: {ultimaVerificacion.toLocaleTimeString('es-AR')}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const ModalActualizacionDisponible = () => {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className={`rounded-2xl w-full max-w-sm ${theme.card}`}>
+          <div className={`p-4 border-b flex justify-between ${theme.border}`}>
+            <h3 className={`font-bold ${theme.text}`}>🔄 Nueva Versión Disponible</h3>
+          </div>
+          <div className="p-4 space-y-4">
+            <div>
+              <p className={`${theme.text} mb-2`}>Se han agregado nuevas funciones y se han corregido varios errores.</p>
+              <div className={`p-3 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-blue-50'}`}>
+                <p className={`text-sm ${theme.textMuted}`}>Versión actual: {versionActual}</p>
+              </div>
+            </div>
+            <div className={`p-3 rounded-xl ${darkMode ? 'bg-green-900/20' : 'bg-green-50'}`}>
+              <p className={`text-sm font-medium ${darkMode ? 'text-green-300' : 'text-green-700'}`}>
+                ✓ Actualizar te dará acceso a las últimas mejoras
+              </p>
+            </div>
+            <p className={`text-xs ${theme.textMuted}`}>
+              La actualización se completará en segundos. No necesitas hacer nada más.
+            </p>
+          </div>
+          <div className={`p-4 border-t flex gap-3 ${theme.border}`}>
+            <button 
+              onClick={() => setActualizacionDisponible(false)} 
+              className={`flex-1 p-3 border rounded-xl ${theme.border} ${theme.text}`}
+            >
+              Más Tarde
+            </button>
+            <button 
+              onClick={aplicarActualizacion}
+              className="flex-1 p-3 bg-green-600 text-white rounded-xl font-medium hover:bg-green-700"
+            >
+              Actualizar Ahora
+            </button>
+          </div>
+        </div>
       </div>
     );
   };
@@ -1080,6 +1219,7 @@ const MonityApp = () => {
       {modal === 'debitos-automaticos' && <ModalDebitosAutomaticos />}
       {modal === 'editar-debito' && <ModalEditarDebito />}
       {modal === 'detalleDeudas' && <ModalDetalleDeudas />}
+      {actualizacionDisponible && <ModalActualizacionDisponible />}
       {alertaActiva && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"><div className={`rounded-2xl w-full max-w-sm p-6 text-center ${theme.card}`}><div className="w-16 h-16 mx-auto mb-4 bg-amber-100 rounded-full flex items-center justify-center"><Bell className="w-8 h-8 text-amber-500" /></div><h3 className={`text-lg font-bold mb-2 ${theme.text}`}>¡Atención!</h3><p className={`mb-6 ${theme.textMuted}`}>{alertaActiva.mensaje}</p><button onClick={() => setAlertaActiva(null)} className="w-full p-3 bg-amber-500 text-white rounded-xl font-medium">Entendido</button></div></div>)}
     </div>
   );

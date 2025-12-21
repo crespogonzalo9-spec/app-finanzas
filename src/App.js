@@ -362,124 +362,106 @@ const MonityApp = () => {
     
     if (!cuenta || !periodo) return;
 
-    let saldoFinal = periodo.saldoFinal;
-
-    // Si hay pago al cerrar, aplicarlo
+    // Calcular saldo del período actual EN TIEMPO REAL
+    const consumosPeriodo = movimientos
+      .filter(m => m.cuentaId === cuentaId && !m.esSaldoAnterior)
+      .reduce((s, m) => s + (m.monto || 0), 0);
+    
+    const pagosPeriodo = pagos
+      .filter(p => p.cuentaId === cuentaId && !p.esParaDeuda)
+      .reduce((s, p) => s + (p.monto || 0), 0);
+    
+    const saldoPeriodoActual = consumosPeriodo - pagosPeriodo;
+    
+    // Deuda anterior de la cuenta
+    const deudaAnterior = cuenta.deudaAcumulada || 0;
+    
+    // Aplicar pago al cerrar (si hay)
+    let saldoDespuesDePago = saldoPeriodoActual;
     if (montoPago > 0) {
-      const nuevoTotalPagos = (periodo.totalPagos || 0) + montoPago;
-      saldoFinal = (periodo.saldoInicial || 0) + (periodo.totalConsumos || 0) + (periodo.totalCuotas || 0) - nuevoTotalPagos;
+      saldoDespuesDePago = Math.max(0, saldoPeriodoActual - montoPago);
       
-      // Crear movimiento de pago
-      await addDoc(collection(db, 'users', user.uid, 'movimientos'), {
+      // Registrar el pago
+      await guardarPago({
         cuentaId,
-        periodoId: periodo.id,
         descripcion: 'Pago al cerrar período',
-        monto: -montoPago,
+        monto: montoPago,
         fecha: new Date().toISOString().slice(0, 10),
-        tipo: 'pago',
-        esCuota: false,
-        esPago: true,
-        createdAt: new Date().toISOString()
-      });
-
-      // Actualizar período con el pago
-      await updateDoc(doc(db, 'users', user.uid, 'periodos', periodo.id), {
-        totalPagos: nuevoTotalPagos,
-        saldoFinal: Math.max(0, saldoFinal)
+        esParaDeuda: false
       });
     }
+    
+    // Lo que queda sin pagar se suma a la deuda acumulada
+    const nuevaDeudaAcumulada = deudaAnterior + saldoDespuesDePago;
 
-    saldoFinal = Math.max(0, saldoFinal);
-
-    // Cerrar período
+    // Cerrar período actual
     await updateDoc(doc(db, 'users', user.uid, 'periodos', periodo.id), {
       estado: 'cerrado',
-      saldoFinal: saldoFinal,
-      deudaPendiente: saldoFinal,
-      fechaCierre: new Date().toISOString().slice(0, 10)
+      totalConsumos: consumosPeriodo,
+      totalPagos: pagosPeriodo + montoPago,
+      saldoFinal: saldoDespuesDePago,
+      fechaCierreReal: new Date().toISOString().slice(0, 10)
     });
 
-    // Crear nuevo período con saldo heredado
-    const mesActual = new Date();
-    const mesProximo = new Date(mesActual.getFullYear(), mesActual.getMonth() + 1, 1);
-    const mesPróximoStr = mesProximo.toISOString().slice(0, 7);
+    // Actualizar deuda acumulada en la cuenta
+    await updateDoc(doc(db, 'users', user.uid, 'cuentas', cuentaId), { 
+      deudaAcumulada: nuevaDeudaAcumulada
+    });
+
+    // Crear nuevo período (empieza en 0, la deuda está en la cuenta)
+    const hoy = new Date();
+    const proximoMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 1);
+    const finProximoMes = new Date(proximoMes.getFullYear(), proximoMes.getMonth() + 1, 0);
 
     const nuevoP = await addDoc(collection(db, 'users', user.uid, 'periodos'), {
       cuentaId,
-      mes: mesPróximoStr,
-      fechaInicio: mesProximo.toISOString().slice(0, 10),
-      fechaCierre: new Date(mesProximo.getFullYear(), mesProximo.getMonth() + 1, 0).toISOString().slice(0, 10),
+      fechaInicio: hoy.toISOString().slice(0, 10),
+      fechaCierre: finProximoMes.toISOString().slice(0, 10),
       estado: 'abierto',
-      saldoInicial: saldoFinal,  // ← HEREDA EL SALDO PENDIENTE
+      saldoInicial: 0, // Empieza en 0, la deuda está en cuenta.deudaAcumulada
       totalConsumos: 0,
       totalCuotas: 0,
       totalPagos: 0,
-      saldoFinal: saldoFinal,
+      saldoFinal: 0,
       createdAt: new Date().toISOString()
     });
 
-    // Procesar cuotas activas para nuevo período
+    // Procesar cuotas activas - generar movimiento para el nuevo período
     for (const cuota of cuotas.filter(c => c.cuentaId === cuentaId && c.cuotasPendientes > 0 && c.estado === 'activa')) {
+      const numeroCuota = cuota.cuotasTotales - cuota.cuotasPendientes + 1;
+      
       await addDoc(collection(db, 'users', user.uid, 'movimientos'), { 
         cuentaId, 
-        periodoId: nuevoP.id,
-        descripcion: `${cuota.descripcion} (${cuota.cuotasTotales - cuota.cuotasPendientes + 1}/${cuota.cuotasTotales})`, 
+        descripcion: `${cuota.descripcion} (${numeroCuota}/${cuota.cuotasTotales})`, 
         monto: cuota.montoCuota, 
         categoria: 'cuota', 
-        fecha: nuevoP.fechaInicio, 
+        fecha: hoy.toISOString().slice(0, 10), 
         esCuota: true, 
         cuotaId: cuota.id,
         createdAt: new Date().toISOString()
       });
+      
       await updateDoc(doc(db, 'users', user.uid, 'cuotas', cuota.id), { 
         cuotasPendientes: cuota.cuotasPendientes - 1, 
         estado: cuota.cuotasPendientes - 1 <= 0 ? 'finalizada' : 'activa' 
       });
     }
 
-    // Procesar débitos automáticos para nuevo período
+    // Procesar débitos automáticos
     const debitosParaCuenta = debitosAutomaticos.filter(d => d.cuentaId === cuentaId);
     for (const debito of debitosParaCuenta) {
       await addDoc(collection(db, 'users', user.uid, 'movimientos'), { 
         cuentaId, 
-        periodoId: nuevoP.id,
         descripcion: `${debito.descripcion} (Débito Automático)`, 
         monto: debito.monto, 
-        categoria: debito.categoria || 'otros', 
-        fecha: nuevoP.fechaInicio, 
+        categoria: debito.categoria || 'servicios', 
+        fecha: hoy.toISOString().slice(0, 10), 
         tipo: 'consumo',
         esDebito: true, 
         debitoAutomaticoId: debito.id,
         createdAt: new Date().toISOString()
       });
     }
-
-    // Actualizar totales del nuevo período
-    const nuevosMovimientos = await getDocs(collection(db, 'users', user.uid, 'movimientos'));
-    let nuevoTotalConsumos = 0;
-    let nuevoTotalCuotas = 0;
-
-    nuevosMovimientos.forEach(doc => {
-      const m = doc.data();
-      if (m.periodoId === nuevoP.id) {
-        if (m.esCuota) {
-          nuevoTotalCuotas += m.monto || 0;
-        } else if (!m.esPago && m.tipo !== 'pago') {
-          nuevoTotalConsumos += m.monto || 0;
-        }
-      }
-    });
-
-    await updateDoc(doc(db, 'users', user.uid, 'periodos', nuevoP.id), {
-      totalConsumos: nuevoTotalConsumos,
-      totalCuotas: nuevoTotalCuotas,
-      saldoFinal: saldoFinal + nuevoTotalConsumos + nuevoTotalCuotas
-    });
-
-    await updateDoc(doc(db, 'users', user.uid, 'cuentas', cuentaId), { 
-      fechaCierreAnterior: cuenta.fechaCierre, 
-      fechaCierre: mesProximo.toISOString().slice(0, 10) 
-    });
     
     setModalCerrarPeriodo(null);
     setPagoAlCerrar('');
@@ -1082,16 +1064,26 @@ const MonityApp = () => {
           </div>
           <div className={`p-4 border-t flex gap-3 ${theme.border}`}>
             <button onClick={() => setModal(null)} className={`flex-1 p-3 border rounded-xl ${theme.border} ${theme.text}`}>Cancelar</button>
-            <button onClick={async () => { 
-              await guardarPago({ 
-                cuentaId, 
-                descripcion: descripcion || (tipoPago === 'deuda' ? 'Pago deuda' : 'Pago período'), 
-                monto: parseFloat(monto), 
-                fecha,
-                esParaDeuda: tipoPago === 'deuda'
-              }); 
-              setModal(null); 
-            }} disabled={!cuentaId || !monto} className={`flex-1 p-3 text-white rounded-xl disabled:opacity-50 ${tipoPago === 'deuda' ? 'bg-rose-600' : 'bg-blue-600'}`}>
+            <button 
+              onClick={async () => { 
+                if (!cuentaId || !monto || parseFloat(monto) <= 0) return;
+                try {
+                  await guardarPago({ 
+                    cuentaId, 
+                    descripcion: descripcion || (tipoPago === 'deuda' ? 'Pago deuda' : 'Pago período'), 
+                    monto: parseFloat(monto), 
+                    fecha,
+                    esParaDeuda: tipoPago === 'deuda'
+                  }); 
+                  setModal(null); 
+                } catch (error) {
+                  console.error('Error al guardar pago:', error);
+                  alert('Error al guardar el pago');
+                }
+              }} 
+              disabled={!cuentaId || !monto || parseFloat(monto) <= 0} 
+              className={`flex-1 p-3 text-white rounded-xl disabled:opacity-50 ${tipoPago === 'deuda' ? 'bg-rose-600' : 'bg-blue-600'}`}
+            >
               {tipoPago === 'deuda' ? 'Pagar Deuda' : 'Registrar Pago'}
             </button>
           </div>
@@ -1170,10 +1162,11 @@ const MonityApp = () => {
   const ModalCerrarPeriodoConPago = () => {
     const cuentaId = modalCerrarPeriodo?.cuentaId;
     const periodo = modalCerrarPeriodo?.periodo;
+    const cuenta = cuentas.find(c => c.id === cuentaId);
     
     if (!periodo || !cuentaId) return null;
 
-    // Calcular valores EN TIEMPO REAL, no usar los del período guardado
+    // Calcular valores EN TIEMPO REAL
     const consumosDelPeriodo = movimientos
       .filter(m => m.cuentaId === cuentaId && !m.esCuota && !m.esSaldoAnterior)
       .reduce((s, m) => s + (m.monto || 0), 0);
@@ -1183,17 +1176,16 @@ const MonityApp = () => {
       .reduce((s, m) => s + (m.monto || 0), 0);
     
     const pagosDelPeriodo = pagos
-      .filter(p => p.cuentaId === cuentaId)
+      .filter(p => p.cuentaId === cuentaId && !p.esParaDeuda)
       .reduce((s, p) => s + (p.monto || 0), 0);
     
-    const saldoInicial = periodo.saldoInicial || 0;
-    const totalConsumos = consumosDelPeriodo;
-    const totalCuotas = cuotasDelPeriodo;
-    const totalPagos = pagosDelPeriodo;
-    const saldoPendiente = saldoInicial + totalConsumos + totalCuotas - totalPagos;
+    const totalConsumos = consumosDelPeriodo + cuotasDelPeriodo;
+    const saldoPeriodo = totalConsumos - pagosDelPeriodo;
+    const deudaActual = cuenta?.deudaAcumulada || 0;
 
     const montoPagoNum = parseFloat(pagoAlCerrar) || 0;
-    const saldoAlProximoPeriodo = Math.max(0, saldoPendiente - montoPagoNum);
+    const saldoDespuesPago = Math.max(0, saldoPeriodo - montoPagoNum);
+    const nuevaDeudaTotal = deudaActual + saldoDespuesPago;
 
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
@@ -1208,67 +1200,74 @@ const MonityApp = () => {
               <h4 className={`font-semibold ${theme.text} mb-3`}>Resumen del Período</h4>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className={theme.textMuted}>Saldo Inicial:</span>
-                  <span className={`font-semibold ${theme.text}`}>{formatCurrency(saldoInicial)}</span>
-                </div>
-                <div className="flex justify-between">
                   <span className={theme.textMuted}>Consumos:</span>
-                  <span className={`font-semibold text-rose-500`}>{formatCurrency(totalConsumos)}</span>
+                  <span className={`font-semibold text-rose-500`}>{formatCurrency(consumosDelPeriodo)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className={theme.textMuted}>Cuotas:</span>
-                  <span className={`font-semibold text-rose-500`}>{formatCurrency(totalCuotas)}</span>
+                  <span className={`font-semibold text-purple-500`}>{formatCurrency(cuotasDelPeriodo)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className={theme.textMuted}>Pagos:</span>
-                  <span className={`font-semibold text-emerald-500`}>{formatCurrency(totalPagos)}</span>
+                  <span className={theme.textMuted}>Pagos realizados:</span>
+                  <span className={`font-semibold text-emerald-500`}>-{formatCurrency(pagosDelPeriodo)}</span>
                 </div>
                 <div className={`border-t ${theme.border} pt-2 mt-2 flex justify-between`}>
-                  <span className={`font-semibold ${theme.text}`}>Saldo Pendiente:</span>
-                  <span className={`text-lg font-bold ${saldoPendiente > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(saldoPendiente)}</span>
+                  <span className={`font-semibold ${theme.text}`}>Saldo a Pagar:</span>
+                  <span className={`text-lg font-bold ${saldoPeriodo > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(saldoPeriodo)}</span>
                 </div>
               </div>
             </div>
 
-            {/* Pregunta de pago */}
-            <div className={`p-4 rounded-2xl border-2 border-amber-500 ${darkMode ? 'bg-amber-900/20' : 'bg-amber-50'}`}>
-              <p className={`text-sm font-semibold ${theme.text} mb-3`}>¿Desea realizar un pago al cerrar este período?</p>
-              <div className="space-y-3">
-                <div>
-                  <label className={`text-xs ${theme.textMuted}`}>Monto a Pagar (opcional)</label>
-                  <input 
-                    type="number" 
-                    value={pagoAlCerrar}
-                    onChange={e => setPagoAlCerrar(e.target.value)}
-                    placeholder="0"
-                    className={`w-full p-3 border rounded-xl ${theme.input}`}
-                  />
+            {/* Deuda actual */}
+            {deudaActual > 0 && (
+              <div className={`p-3 rounded-xl ${darkMode ? 'bg-rose-900/30' : 'bg-rose-50'} border border-rose-500`}>
+                <div className="flex justify-between items-center">
+                  <span className={`text-sm ${theme.text}`}>Deuda acumulada anterior:</span>
+                  <span className="font-bold text-rose-500">{formatCurrency(deudaActual)}</span>
                 </div>
-                
-                {montoPagoNum > 0 && (
-                  <div className={`p-3 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-blue-50'}`}>
-                    <div className="flex justify-between mb-2 text-sm">
-                      <span className={theme.textMuted}>Saldo Pendiente:</span>
-                      <span className={`font-semibold ${theme.text}`}>{formatCurrency(saldoPendiente)}</span>
-                    </div>
-                    <div className="flex justify-between mb-2 text-sm">
-                      <span className={theme.textMuted}>Pago Realizado:</span>
-                      <span className={`font-semibold text-emerald-500`}>{formatCurrency(montoPagoNum)}</span>
-                    </div>
-                    <div className={`border-t ${theme.border} pt-2 flex justify-between text-sm`}>
-                      <span className={`font-semibold ${theme.text}`}>Saldo al Próximo Período:</span>
-                      <span className={`text-base font-bold ${saldoAlProximoPeriodo > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
-                        {formatCurrency(saldoAlProximoPeriodo)}
-                      </span>
-                    </div>
-                  </div>
-                )}
               </div>
+            )}
+
+            {/* Pago al cerrar */}
+            <div className={`p-4 rounded-2xl border-2 border-amber-500 ${darkMode ? 'bg-amber-900/20' : 'bg-amber-50'}`}>
+              <p className={`text-sm font-semibold ${theme.text} mb-3`}>¿Cuánto vas a pagar ahora?</p>
+              <input 
+                type="number" 
+                value={pagoAlCerrar}
+                onChange={e => setPagoAlCerrar(e.target.value)}
+                placeholder="0"
+                className={`w-full p-3 border rounded-xl ${theme.input}`}
+              />
+              
+              {saldoPeriodo > 0 && (
+                <div className={`mt-3 p-3 rounded-xl ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+                  <div className="flex justify-between mb-2 text-sm">
+                    <span className={theme.textMuted}>Saldo del período:</span>
+                    <span className={`font-semibold text-rose-500`}>{formatCurrency(saldoPeriodo)}</span>
+                  </div>
+                  <div className="flex justify-between mb-2 text-sm">
+                    <span className={theme.textMuted}>Tu pago:</span>
+                    <span className={`font-semibold text-emerald-500`}>-{formatCurrency(montoPagoNum)}</span>
+                  </div>
+                  <div className={`border-t ${theme.border} pt-2 flex justify-between`}>
+                    <span className={`font-semibold text-sm ${theme.text}`}>Se suma a deuda:</span>
+                    <span className={`font-bold ${saldoDespuesPago > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                      {formatCurrency(saldoDespuesPago)}
+                    </span>
+                  </div>
+                  {saldoDespuesPago > 0 && (
+                    <div className={`mt-2 pt-2 border-t ${theme.border} flex justify-between`}>
+                      <span className={`text-xs ${theme.textMuted}`}>Nueva deuda total:</span>
+                      <span className="font-bold text-rose-500">{formatCurrency(nuevaDeudaTotal)}</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
           <div className={`p-4 border-t flex gap-3 ${theme.border}`}>
             <button onClick={() => { setModalCerrarPeriodo(null); setPagoAlCerrar(''); }} className={`flex-1 p-3 border rounded-xl ${theme.border} ${theme.text}`}>Cancelar</button>
-            <button onClick={() => cerrarPeriodo(cuentaId, montoPagoNum)} className="flex-1 p-3 bg-blue-600 text-white rounded-xl font-medium">Cerrar Período</button>
+            <button onClick={() => cerrarPeriodo(cuentaId, montoPagoNum)} className="flex-1 p-3 bg-indigo-600 text-white rounded-xl font-medium">Cerrar Período</button>
           </div>
         </div>
       </div>

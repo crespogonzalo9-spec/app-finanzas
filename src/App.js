@@ -244,8 +244,28 @@ const MonityApp = () => {
   // NUEVAS FUNCIONES PARA DÉBITOS AUTOMÁTICOS
   const guardarDebito = async (datos) => {
     if (!user) return;
+    // Guardar el débito automático
     const ref = await addDoc(collection(db, 'users', user.uid, 'debitosAutomaticos'), datos);
     setDebitosAutomaticos([...debitosAutomaticos, { id: ref.id, ...datos }]);
+    
+    // IMPACTAR INMEDIATAMENTE EN EL PERÍODO ACTUAL
+    const cuenta = cuentas.find(c => c.id === datos.cuentaId);
+    const periodo = periodos.find(p => p.cuentaId === datos.cuentaId && p.estado === 'abierto');
+    
+    if (cuenta && periodo) {
+      // Crear movimiento en el período actual con la fecha actual
+      const movData = {
+        cuentaId: datos.cuentaId,
+        descripcion: `${datos.descripcion} (Débito Automático)`,
+        monto: datos.monto,
+        categoria: datos.categoria || 'otros',
+        fecha: new Date().toISOString().slice(0, 10),
+        tipo: 'consumo',
+        esDebito: true,
+        debitoAutomaticoId: ref.id
+      };
+      await guardarMovimiento(movData);
+    }
   };
 
   const actualizarDebito = async (id, datos) => {
@@ -274,10 +294,28 @@ const MonityApp = () => {
     const nuevaFecha = new Date(cuenta.fechaCierre + 'T12:00:00');
     nuevaFecha.setMonth(nuevaFecha.getMonth() + 1);
     const nuevoP = await guardarPeriodo({ cuentaId, fechaInicio: cuenta.fechaCierre, fechaCierre: nuevaFecha.toISOString().slice(0, 10), estado: 'abierto', saldoInicial: saldo > 0 ? saldo : 0 });
+    
+    // Procesar cuotas activas
     for (const cuota of cuotas.filter(c => c.cuentaId === cuentaId && c.cuotasPendientes > 0 && c.estado === 'activa')) {
       await guardarMovimiento({ cuentaId, descripcion: `${cuota.descripcion} (${cuota.cuotasTotales - cuota.cuotasPendientes + 1}/${cuota.cuotasTotales})`, monto: cuota.montoCuota, categoria: 'cuota', fecha: nuevoP.fechaInicio, esCuota: true, cuotaId: cuota.id });
       await actualizarCuota(cuota.id, { cuotasPendientes: cuota.cuotasPendientes - 1, estado: cuota.cuotasPendientes - 1 <= 0 ? 'finalizada' : 'activa' });
     }
+    
+    // NUEVO: Procesar débitos automáticos en el nuevo período
+    const debitosParaCuenta = debitosAutomaticos.filter(d => d.cuentaId === cuentaId);
+    for (const debito of debitosParaCuenta) {
+      await guardarMovimiento({ 
+        cuentaId, 
+        descripcion: `${debito.descripcion} (Débito Automático)`, 
+        monto: debito.monto, 
+        categoria: debito.categoria || 'otros', 
+        fecha: nuevoP.fechaInicio, 
+        tipo: 'consumo',
+        esDebito: true, 
+        debitoAutomaticoId: debito.id 
+      });
+    }
+    
     await updateDoc(doc(db, 'users', user.uid, 'cuentas', cuentaId), { fechaCierreAnterior: cuenta.fechaCierre, fechaCierre: nuevaFecha.toISOString().slice(0, 10) });
     await cargarDatos(user.uid);
   };
@@ -519,6 +557,7 @@ const MonityApp = () => {
           descripcion, 
           monto: montoTotal, 
           categoria, 
+          fecha: new Date().toISOString().slice(0, 10),
           timestamp: new Date().toISOString(),
           cuotas: tipoQuotas !== 'sin' ? { tipo: tipoQuotas, cantidad: numCuotas, montoCuota } : null
         });

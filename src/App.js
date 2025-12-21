@@ -128,6 +128,7 @@ const MonityApp = () => {
   const [movimientoEditar, setMovimientoEditar] = useState(null);
   const [cuotaEditar, setCuotaEditar] = useState(null);
   const [cuentaEditar, setCuentaEditar] = useState(null);
+  const [pagoEditar, setPagoEditar] = useState(null);
   const [config, setConfig] = useState({ alertaGastoAlto: false, montoAlertaGasto: 10000, alertaPorcentaje: false, porcentajeAlerta: 80 });
   const [versionActual, setVersionActual] = useState('1.0.0');
   const [actualizacionDisponible, setActualizacionDisponible] = useState(false);
@@ -300,6 +301,8 @@ const MonityApp = () => {
   const actualizarMovimiento = async (id, datos) => { if (user) { await updateDoc(doc(db, 'users', user.uid, 'movimientos', id), datos); setMovimientos(movimientos.map(m => m.id === id ? { ...m, ...datos } : m)); } };
   const eliminarMovimiento = async (id) => { if (user) { await deleteDoc(doc(db, 'users', user.uid, 'movimientos', id)); setMovimientos(movimientos.filter(m => m.id !== id)); } };
   const guardarPago = async (p) => { if (!user) return; const ref = await addDoc(collection(db, 'users', user.uid, 'pagos'), p); setPagos([...pagos, { ...p, id: ref.id }]); return ref.id; };
+  const actualizarPago = async (id, datos) => { if (user) { await updateDoc(doc(db, 'users', user.uid, 'pagos', id), datos); setPagos(pagos.map(p => p.id === id ? { ...p, ...datos } : p)); } };
+  const eliminarPago = async (id) => { if (user) { await deleteDoc(doc(db, 'users', user.uid, 'pagos', id)); setPagos(pagos.filter(p => p.id !== id)); } };
   const guardarPeriodo = async (p) => { if (!user) return; const ref = await addDoc(collection(db, 'users', user.uid, 'periodos'), p); const n = { ...p, id: ref.id }; setPeriodos([...periodos, n]); return n; };
   const guardarCuota = async (c) => { if (!user) return; const ref = await addDoc(collection(db, 'users', user.uid, 'cuotas'), c); setCuotas([...cuotas, { ...c, id: ref.id }]); return ref.id; };
   const actualizarCuota = async (id, datos) => { if (user) { await updateDoc(doc(db, 'users', user.uid, 'cuotas', id), datos); setCuotas(cuotas.map(c => c.id === id ? { ...c, ...datos } : c)); } };
@@ -706,6 +709,9 @@ const MonityApp = () => {
                   {m.tipo === 'consumo' && !m.esSaldoAnterior && (
                     <div className="flex gap-1"><button onClick={() => { setMovimientoEditar(m); setModal('editar-mov'); }} className="p-1 text-blue-500"><Edit3 className="w-3 h-3" /></button><button onClick={() => { if(window.confirm('¿Eliminar?')) eliminarMovimiento(m.id); }} className="p-1 text-red-500"><Trash2 className="w-3 h-3" /></button></div>
                   )}
+                  {m.tipo === 'pago' && (
+                    <div className="flex gap-1"><button onClick={() => { setPagoEditar(m); setModal('editar-pago'); }} className="p-1 text-blue-500"><Edit3 className="w-3 h-3" /></button><button onClick={() => { if(window.confirm('¿Eliminar este pago?')) eliminarPago(m.id); }} className="p-1 text-red-500"><Trash2 className="w-3 h-3" /></button></div>
+                  )}
                 </div>
               ))}
             </div>
@@ -1001,7 +1007,28 @@ const MonityApp = () => {
     );
   };
 
-  const ModalEditarCuota = () => {
+  const ModalEditarPago = () => {
+    const [desc, setDesc] = useState(pagoEditar?.descripcion || '');
+    const [monto, setMonto] = useState(pagoEditar?.monto?.toString() || '');
+    const [fecha, setFecha] = useState(pagoEditar?.fecha || '');
+    if (!pagoEditar) return null;
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className={`rounded-2xl w-full max-w-lg ${theme.card}`}>
+          <div className={`p-4 border-b flex justify-between ${theme.border}`}><h3 className={`font-bold ${theme.text}`}>Editar Pago</h3><button onClick={() => { setModal(null); setPagoEditar(null); }}><X className={`w-5 h-5 ${theme.text}`} /></button></div>
+          <div className="p-4 space-y-4">
+            <input type="text" value={desc} onChange={e => setDesc(e.target.value)} placeholder="Descripción" className={`w-full p-3 border rounded-xl ${theme.input}`} />
+            <input type="number" value={monto} onChange={e => setMonto(e.target.value)} placeholder="Monto" className={`w-full p-3 border rounded-xl ${theme.input}`} />
+            <DatePicker label="Fecha" value={fecha} onChange={setFecha} darkMode={darkMode} theme={theme} />
+          </div>
+          <div className={`p-4 border-t flex gap-3 ${theme.border}`}>
+            <button onClick={() => { setModal(null); setPagoEditar(null); }} className={`flex-1 p-3 border rounded-xl ${theme.border} ${theme.text}`}>Cancelar</button>
+            <button onClick={async () => { await actualizarPago(pagoEditar.id, { descripcion: desc, monto: parseFloat(monto), fecha }); setModal(null); setPagoEditar(null); }} className="flex-1 p-3 bg-emerald-600 text-white rounded-xl">Guardar</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
     const [desc, setDesc] = useState(cuotaEditar?.descripcion || '');
     const [monto, setMonto] = useState(cuotaEditar?.montoCuota?.toString() || '');
     const [total, setTotal] = useState(cuotaEditar?.cuotasTotales?.toString() || '');
@@ -1289,84 +1316,83 @@ const MonityApp = () => {
   };
 
   const ModalDetalleDeudas = () => {
-    const detalleDeudas = obtenerDetalleDeudas();
     const todasLasCuentas = cuentasContables.map(cuenta => ({
       id: cuenta.id,
       nombre: cuenta.nombre,
       entidad: cuenta.entidad,
       tipoCuenta: cuenta.tipoCuenta,
-      deuda: calcularDeudaPorCuenta(cuenta.id),
-      consumos: movimientos.filter(m => m.cuentaId === cuenta.id).reduce((acc, m) => acc + (m.monto || 0), 0),
+      saldo: calcularSaldo(cuenta.id),
+      consumos: movimientos.filter(m => m.cuentaId === cuenta.id && !m.esSaldoAnterior).reduce((acc, m) => acc + (m.monto || 0), 0),
       pagos: pagos.filter(p => p.cuentaId === cuenta.id).reduce((acc, p) => acc + (p.monto || 0), 0)
     }));
 
+    const totalConsumos = todasLasCuentas.reduce((s, c) => s + c.consumos, 0);
+    const totalPagosGlobal = todasLasCuentas.reduce((s, c) => s + c.pagos, 0);
+
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-        <div className={`rounded-2xl w-full max-w-2xl my-4 ${theme.card}`}>
-          <div className={`p-4 border-b flex justify-between ${theme.border}`}>
-            <h3 className={`font-bold ${theme.text}`}>Detalle de Deudas por Cuenta</h3>
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className={`rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col ${theme.card}`}>
+          <div className={`p-4 border-b flex justify-between shrink-0 ${theme.border}`}>
+            <h3 className={`font-bold ${theme.text}`}>Resumen por Cuenta</h3>
             <button onClick={() => setModal(null)}><X className={`w-5 h-5 ${theme.text}`} /></button>
           </div>
-          <div className="p-4">
+          
+          <div className="p-4 overflow-y-auto flex-1">
             {todasLasCuentas.length === 0 ? (
               <div className={`text-center ${theme.textMuted}`}>No tienes cuentas registradas</div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {todasLasCuentas.map(cuenta => (
-                  <div key={cuenta.id} className={`p-4 rounded-2xl border ${theme.border}`}>
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-3">
-                        <EntidadLogo entidad={cuenta.entidad} size={40} />
-                        <div>
-                          <div className={`font-semibold ${theme.text}`}>{cuenta.nombre}</div>
-                          <div className={`text-xs ${theme.textMuted}`}>{TIPOS_CUENTA.find(t => t.id === cuenta.tipoCuenta)?.nombre}</div>
-                        </div>
+                  <div key={cuenta.id} className={`p-3 rounded-xl border ${theme.border}`}>
+                    <div className="flex items-center gap-3 mb-2">
+                      <EntidadLogo entidad={cuenta.entidad} size={36} />
+                      <div className="flex-1 min-w-0">
+                        <div className={`font-semibold text-sm truncate ${theme.text}`}>{cuenta.nombre}</div>
+                        <div className={`text-xs ${theme.textMuted}`}>{TIPOS_CUENTA.find(t => t.id === cuenta.tipoCuenta)?.nombre}</div>
                       </div>
-                      <div className="text-right">
-                        <div className={`text-sm ${theme.textMuted}`}>Deuda</div>
-                        <div className={`text-2xl font-bold ${cuenta.deuda > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
-                          {formatCurrency(cuenta.deuda)}
-                        </div>
+                      <div className={`text-lg font-bold ${cuenta.saldo > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                        {formatCurrency(cuenta.saldo)}
                       </div>
                     </div>
-
-                    {/* Desglose de consumos y pagos */}
-                    <div className={`p-3 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-slate-50'}`}>
-                      <div className="grid grid-cols-3 gap-3 text-center">
-                        <div>
-                          <div className={`text-xs ${theme.textMuted}`}>Consumos</div>
-                          <div className={`font-bold text-rose-500`}>{formatCurrency(cuenta.consumos)}</div>
-                        </div>
-                        <div>
-                          <div className={`text-xs ${theme.textMuted}`}>Pagos</div>
-                          <div className={`font-bold text-emerald-500`}>{formatCurrency(cuenta.pagos)}</div>
-                        </div>
-                        <div>
-                          <div className={`text-xs ${theme.textMuted}`}>Diferencia</div>
-                          <div className={`font-bold ${cuenta.deuda > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
-                            {formatCurrency(cuenta.deuda)}
-                          </div>
-                        </div>
+                    <div className={`grid grid-cols-3 gap-2 text-center text-xs p-2 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
+                      <div>
+                        <div className={theme.textMuted}>Consumos</div>
+                        <div className="font-semibold text-rose-500">{formatCurrency(cuenta.consumos)}</div>
+                      </div>
+                      <div>
+                        <div className={theme.textMuted}>Pagos</div>
+                        <div className="font-semibold text-emerald-500">{formatCurrency(cuenta.pagos)}</div>
+                      </div>
+                      <div>
+                        <div className={theme.textMuted}>Saldo</div>
+                        <div className={`font-semibold ${cuenta.saldo > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(cuenta.saldo)}</div>
                       </div>
                     </div>
                   </div>
                 ))}
-
-                {/* Resumen total */}
-                <div className={`p-4 rounded-2xl border-2 border-rose-500 ${darkMode ? 'bg-rose-900/20' : 'bg-rose-50'}`}>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className={`text-sm font-medium ${theme.textMuted}`}>Total General</div>
-                      <div className={`text-sm ${theme.textMuted}`}>Deuda de todas las cuentas</div>
-                    </div>
-                    <div className={`text-3xl font-bold text-rose-500`}>{formatCurrency(totalDeudas)}</div>
-                  </div>
-                </div>
               </div>
             )}
           </div>
-          <div className={`p-4 border-t flex gap-3 ${theme.border}`}>
-            <button onClick={() => setModal(null)} className="flex-1 p-3 bg-indigo-600 text-white rounded-xl font-medium">Cerrar</button>
+
+          {/* Resumen total fijo abajo */}
+          <div className={`p-4 border-t shrink-0 ${theme.border}`}>
+            <div className={`p-3 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
+              <div className="grid grid-cols-3 gap-2 text-center text-sm mb-2">
+                <div>
+                  <div className={`text-xs ${theme.textMuted}`}>Total Consumos</div>
+                  <div className="font-bold text-rose-500">{formatCurrency(totalConsumos)}</div>
+                </div>
+                <div>
+                  <div className={`text-xs ${theme.textMuted}`}>Total Pagos</div>
+                  <div className="font-bold text-emerald-500">{formatCurrency(totalPagosGlobal)}</div>
+                </div>
+                <div>
+                  <div className={`text-xs ${theme.textMuted}`}>Deuda Total</div>
+                  <div className={`font-bold text-lg ${totalDeudas > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(totalDeudas)}</div>
+                </div>
+              </div>
+            </div>
+            <button onClick={() => setModal(null)} className="w-full mt-3 p-3 bg-indigo-600 text-white rounded-xl font-medium">Cerrar</button>
           </div>
         </div>
       </div>
@@ -1421,6 +1447,7 @@ const MonityApp = () => {
       {modal === 'consumo' && <ModalConsumo />}
       {modal === 'pago' && <ModalPago />}
       {modal === 'editar-mov' && <ModalEditarMov />}
+      {modal === 'editar-pago' && <ModalEditarPago />}
       {modal === 'editar-cuota' && <ModalEditarCuota />}
       {modal === 'debitos-automaticos' && <ModalDebitosAutomaticos />}
       {modal === 'editar-debito' && <ModalEditarDebito />}

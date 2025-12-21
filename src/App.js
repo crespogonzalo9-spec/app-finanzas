@@ -333,17 +333,33 @@ const MonityApp = () => {
     return (p.saldoInicial || 0) + c.reduce((s, m) => s + m.monto, 0) - pg.reduce((s, x) => s + x.monto, 0);
   };
   
-  const totalDeudas = cuentasContables.reduce((s, c) => s + Math.max(0, calcularSaldo(c.id)), 0);
+  // NUEVA FUNCIÓN: Calcular deuda por cuenta (consumos - pagos de esa cuenta)
+  const calcularDeudaPorCuenta = (cuentaId) => {
+    const consumos = movimientos.filter(m => m.cuentaId === cuentaId).reduce((acc, m) => acc + (m.monto || 0), 0);
+    const pagosCuenta = pagos.filter(p => p.cuentaId === cuentaId).reduce((acc, p) => acc + (p.monto || 0), 0);
+    const deuda = consumos - pagosCuenta;
+    return Math.max(0, deuda); // No mostrar deudas negativas
+  };
+
+  // NUEVA FUNCIÓN: Obtener deudas detalladas por cuenta
+  const obtenerDetalleDeudas = () => {
+    return cuentasContables.map(cuenta => ({
+      id: cuenta.id,
+      nombre: cuenta.nombre,
+      entidad: cuenta.entidad,
+      tipoCuenta: cuenta.tipoCuenta,
+      deuda: calcularDeudaPorCuenta(cuenta.id),
+      consumos: movimientos.filter(m => m.cuentaId === cuenta.id).reduce((acc, m) => acc + (m.monto || 0), 0),
+      pagos: pagos.filter(p => p.cuentaId === cuenta.id).reduce((acc, p) => acc + (p.monto || 0), 0)
+    })).filter(c => c.deuda > 0); // Solo mostrar las que tienen deuda
+  };
+
+  // Total de deudas (suma de todas las cuentas)
+  const totalDeudas = cuentasContables.reduce((s, c) => s + calcularDeudaPorCuenta(c.id), 0);
   
   // NUEVOS CÁLCULOS PARA PUNTO 3
   const calcularTotalConsumos = () => {
     return movimientos.reduce((acc, m) => acc + (m.monto || 0), 0);
-  };
-
-  const calcularDeudaTotal = () => {
-    const totalConsumos = calcularTotalConsumos();
-    const totalPagos = pagos.reduce((acc, p) => acc + (p.monto || 0), 0);
-    return totalConsumos - totalPagos;
   };
 
   const calcularSaldoDisponible = () => {
@@ -374,10 +390,11 @@ const MonityApp = () => {
           <div className={`text-sm font-medium ${darkMode ? 'text-emerald-200' : 'text-emerald-700'}`}>Ingresos</div>
           <div className={`text-2xl font-bold ${darkMode ? 'text-emerald-300' : 'text-emerald-600'}`}>{formatCurrency(totalIngresos)}</div>
         </div>
-        <div className={`p-4 rounded-2xl ${darkMode ? 'bg-rose-900' : 'bg-rose-50'}`}>
+        <button onClick={() => setModal('detalleDeudas')} className={`p-4 rounded-2xl cursor-pointer transition-all hover:shadow-lg ${darkMode ? 'bg-rose-900 hover:bg-rose-800' : 'bg-rose-50 hover:bg-rose-100'}`}>
           <div className={`text-sm font-medium ${darkMode ? 'text-rose-200' : 'text-rose-700'}`}>Deudas</div>
-          <div className={`text-2xl font-bold ${darkMode ? 'text-rose-300' : 'text-rose-600'}`}>{formatCurrency(calcularDeudaTotal())}</div>
-        </div>
+          <div className={`text-2xl font-bold ${darkMode ? 'text-rose-300' : 'text-rose-600'}`}>{formatCurrency(totalDeudas)}</div>
+          <div className={`text-xs mt-2 ${darkMode ? 'text-rose-300' : 'text-rose-600'}`}>Toca para ver detalle</div>
+        </button>
         <div className={`p-4 rounded-2xl ${darkMode ? 'bg-amber-900' : 'bg-amber-50'}`}>
           <div className={`text-sm font-medium ${darkMode ? 'text-amber-200' : 'text-amber-700'}`}>Total Consumos</div>
           <div className={`text-2xl font-bold ${darkMode ? 'text-amber-300' : 'text-amber-600'}`}>{formatCurrency(calcularTotalConsumos())}</div>
@@ -814,6 +831,91 @@ const MonityApp = () => {
     );
   };
 
+  const ModalDetalleDeudas = () => {
+    const detalleDeudas = obtenerDetalleDeudas();
+    const todasLasCuentas = cuentasContables.map(cuenta => ({
+      id: cuenta.id,
+      nombre: cuenta.nombre,
+      entidad: cuenta.entidad,
+      tipoCuenta: cuenta.tipoCuenta,
+      deuda: calcularDeudaPorCuenta(cuenta.id),
+      consumos: movimientos.filter(m => m.cuentaId === cuenta.id).reduce((acc, m) => acc + (m.monto || 0), 0),
+      pagos: pagos.filter(p => p.cuentaId === cuenta.id).reduce((acc, p) => acc + (p.monto || 0), 0)
+    }));
+
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+        <div className={`rounded-2xl w-full max-w-2xl my-4 ${theme.card}`}>
+          <div className={`p-4 border-b flex justify-between ${theme.border}`}>
+            <h3 className={`font-bold ${theme.text}`}>Detalle de Deudas por Cuenta</h3>
+            <button onClick={() => setModal(null)}><X className={`w-5 h-5 ${theme.text}`} /></button>
+          </div>
+          <div className="p-4">
+            {todasLasCuentas.length === 0 ? (
+              <div className={`text-center ${theme.textMuted}`}>No tienes cuentas registradas</div>
+            ) : (
+              <div className="space-y-4">
+                {todasLasCuentas.map(cuenta => (
+                  <div key={cuenta.id} className={`p-4 rounded-2xl border ${theme.border}`}>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <EntidadLogo entidad={cuenta.entidad} size={40} />
+                        <div>
+                          <div className={`font-semibold ${theme.text}`}>{cuenta.nombre}</div>
+                          <div className={`text-xs ${theme.textMuted}`}>{TIPOS_CUENTA.find(t => t.id === cuenta.tipoCuenta)?.nombre}</div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className={`text-sm ${theme.textMuted}`}>Deuda</div>
+                        <div className={`text-2xl font-bold ${cuenta.deuda > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                          {formatCurrency(cuenta.deuda)}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Desglose de consumos y pagos */}
+                    <div className={`p-3 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-slate-50'}`}>
+                      <div className="grid grid-cols-3 gap-3 text-center">
+                        <div>
+                          <div className={`text-xs ${theme.textMuted}`}>Consumos</div>
+                          <div className={`font-bold text-rose-500`}>{formatCurrency(cuenta.consumos)}</div>
+                        </div>
+                        <div>
+                          <div className={`text-xs ${theme.textMuted}`}>Pagos</div>
+                          <div className={`font-bold text-emerald-500`}>{formatCurrency(cuenta.pagos)}</div>
+                        </div>
+                        <div>
+                          <div className={`text-xs ${theme.textMuted}`}>Diferencia</div>
+                          <div className={`font-bold ${cuenta.deuda > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                            {formatCurrency(cuenta.deuda)}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Resumen total */}
+                <div className={`p-4 rounded-2xl border-2 border-rose-500 ${darkMode ? 'bg-rose-900/20' : 'bg-rose-50'}`}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className={`text-sm font-medium ${theme.textMuted}`}>Total General</div>
+                      <div className={`text-sm ${theme.textMuted}`}>Deuda de todas las cuentas</div>
+                    </div>
+                    <div className={`text-3xl font-bold text-rose-500`}>{formatCurrency(totalDeudas)}</div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          <div className={`p-4 border-t flex gap-3 ${theme.border}`}>
+            <button onClick={() => setModal(null)} className="flex-1 p-3 bg-indigo-600 text-white rounded-xl font-medium">Cerrar</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const tabs = [
     { id: 'dashboard', label: 'Inicio', icon: <Home className="w-5 h-5" /> },
     { id: 'stats', label: 'Stats', icon: <BarChart3 className="w-5 h-5" /> },
@@ -865,6 +967,7 @@ const MonityApp = () => {
       {modal === 'editar-cuota' && <ModalEditarCuota />}
       {modal === 'debitos-automaticos' && <ModalDebitosAutomaticos />}
       {modal === 'editar-debito' && <ModalEditarDebito />}
+      {modal === 'detalleDeudas' && <ModalDetalleDeudas />}
       {alertaActiva && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"><div className={`rounded-2xl w-full max-w-sm p-6 text-center ${theme.card}`}><div className="w-16 h-16 mx-auto mb-4 bg-amber-100 rounded-full flex items-center justify-center"><Bell className="w-8 h-8 text-amber-500" /></div><h3 className={`text-lg font-bold mb-2 ${theme.text}`}>¡Atención!</h3><p className={`mb-6 ${theme.textMuted}`}>{alertaActiva.mensaje}</p><button onClick={() => setAlertaActiva(null)} className="w-full p-3 bg-amber-500 text-white rounded-xl font-medium">Entendido</button></div></div>)}
     </div>
   );

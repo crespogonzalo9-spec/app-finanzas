@@ -1027,10 +1027,28 @@ const MonityApp = () => {
     const cuentaId = modalCerrarPeriodo?.cuentaId;
     const periodo = modalCerrarPeriodo?.periodo;
     
-    if (!periodo) return null;
+    if (!periodo || !cuentaId) return null;
+
+    // Calcular valores EN TIEMPO REAL, no usar los del período guardado
+    const consumosDelPeriodo = movimientos
+      .filter(m => m.cuentaId === cuentaId && !m.esCuota && !m.esSaldoAnterior)
+      .reduce((s, m) => s + (m.monto || 0), 0);
+    
+    const cuotasDelPeriodo = movimientos
+      .filter(m => m.cuentaId === cuentaId && m.esCuota)
+      .reduce((s, m) => s + (m.monto || 0), 0);
+    
+    const pagosDelPeriodo = pagos
+      .filter(p => p.cuentaId === cuentaId)
+      .reduce((s, p) => s + (p.monto || 0), 0);
+    
+    const saldoInicial = periodo.saldoInicial || 0;
+    const totalConsumos = consumosDelPeriodo;
+    const totalCuotas = cuotasDelPeriodo;
+    const totalPagos = pagosDelPeriodo;
+    const saldoPendiente = saldoInicial + totalConsumos + totalCuotas - totalPagos;
 
     const montoPagoNum = parseFloat(pagoAlCerrar) || 0;
-    const saldoPendiente = periodo.saldoFinal || 0;
     const saldoAlProximoPeriodo = Math.max(0, saldoPendiente - montoPagoNum);
 
     return (
@@ -1047,23 +1065,23 @@ const MonityApp = () => {
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className={theme.textMuted}>Saldo Inicial:</span>
-                  <span className={`font-semibold ${theme.text}`}>{formatCurrency(periodo.saldoInicial || 0)}</span>
+                  <span className={`font-semibold ${theme.text}`}>{formatCurrency(saldoInicial)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className={theme.textMuted}>Consumos:</span>
-                  <span className={`font-semibold text-rose-500`}>{formatCurrency(periodo.totalConsumos || 0)}</span>
+                  <span className={`font-semibold text-rose-500`}>{formatCurrency(totalConsumos)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className={theme.textMuted}>Cuotas:</span>
-                  <span className={`font-semibold text-rose-500`}>{formatCurrency(periodo.totalCuotas || 0)}</span>
+                  <span className={`font-semibold text-rose-500`}>{formatCurrency(totalCuotas)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className={theme.textMuted}>Pagos:</span>
-                  <span className={`font-semibold text-emerald-500`}>{formatCurrency(periodo.totalPagos || 0)}</span>
+                  <span className={`font-semibold text-emerald-500`}>{formatCurrency(totalPagos)}</span>
                 </div>
                 <div className={`border-t ${theme.border} pt-2 mt-2 flex justify-between`}>
                   <span className={`font-semibold ${theme.text}`}>Saldo Pendiente:</span>
-                  <span className={`text-lg font-bold text-rose-500`}>{formatCurrency(saldoPendiente)}</span>
+                  <span className={`text-lg font-bold ${saldoPendiente > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(saldoPendiente)}</span>
                 </div>
               </div>
             </div>

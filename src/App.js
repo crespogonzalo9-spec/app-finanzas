@@ -489,58 +489,66 @@ const MonityApp = () => {
   const totalIngresos = cuentasIngreso.reduce((s, c) => s + (c.montoMensual || 0), 0);
   
   const calcularSaldo = (id) => {
-    const p = periodos.find(p => p.cuentaId === id && p.estado === 'abierto');
-    if (!p) return 0;
-    const c = movimientos.filter(m => m.cuentaId === id && m.fecha >= p.fechaInicio && m.fecha <= p.fechaCierre);
-    const pg = pagos.filter(x => x.cuentaId === id && x.fecha >= p.fechaInicio && x.fecha <= p.fechaCierre);
-    return (p.saldoInicial || 0) + c.reduce((s, m) => s + m.monto, 0) - pg.reduce((s, x) => s + x.monto, 0);
+    // Calcular consumos totales de la cuenta (sin importar período)
+    const consumosTotales = movimientos
+      .filter(m => m.cuentaId === id && !m.esSaldoAnterior)
+      .reduce((s, m) => s + (m.monto || 0), 0);
+    
+    // Calcular pagos totales de la cuenta
+    const pagosTotales = pagos
+      .filter(p => p.cuentaId === id)
+      .reduce((s, p) => s + (p.monto || 0), 0);
+    
+    return consumosTotales - pagosTotales;
   };
   
-  // NUEVA FUNCIÓN: Calcular deuda por cuenta (usa saldoFinal del período abierto)
+  // Calcular deuda por cuenta (igual a calcularSaldo pero solo positivos)
   const calcularDeudaPorCuenta = (cuentaId) => {
-    const periodo = periodos.find(p => p.cuentaId === cuentaId && p.estado === 'abierto');
-    if (!periodo) return 0;
-    
-    // Retornar el saldoFinal del período (ya tiene todo calculado)
-    return Math.max(0, periodo.saldoFinal || 0);
+    return Math.max(0, calcularSaldo(cuentaId));
   };
 
-  // NUEVA FUNCIÓN: Obtener deudas detalladas por cuenta
+  // Obtener deudas detalladas por cuenta
   const obtenerDetalleDeudas = () => {
     return cuentasContables
       .map(cuenta => {
-        const periodo = periodos.find(p => p.cuentaId === cuenta.id && p.estado === 'abierto');
-        if (!periodo) return null;
+        const deuda = calcularDeudaPorCuenta(cuenta.id);
+        const consumos = movimientos
+          .filter(m => m.cuentaId === cuenta.id && !m.esSaldoAnterior)
+          .reduce((s, m) => s + (m.monto || 0), 0);
+        const pagosTotal = pagos
+          .filter(p => p.cuentaId === cuenta.id)
+          .reduce((s, p) => s + (p.monto || 0), 0);
         
         return {
           id: cuenta.id,
           nombre: cuenta.nombre,
           entidad: cuenta.entidad,
           tipoCuenta: cuenta.tipoCuenta,
-          deuda: Math.max(0, periodo.saldoFinal || 0),
-          consumos: (periodo.totalConsumos || 0) + (periodo.totalCuotas || 0),
-          pagos: periodo.totalPagos || 0,
-          saldoInicial: periodo.saldoInicial || 0
+          deuda: deuda,
+          consumos: consumos,
+          pagos: pagosTotal
         };
       })
-      .filter(c => c !== null && c.deuda > 0);
+      .filter(c => c.deuda > 0);
   };
 
   // Total de deudas (suma de todas las cuentas)
   const totalDeudas = cuentasContables.reduce((s, c) => s + calcularDeudaPorCuenta(c.id), 0);
   
-  // NUEVOS CÁLCULOS PARA PUNTO 3
+  // Calcular total de consumos (en tiempo real)
   const calcularTotalConsumos = () => {
-    // Solo contar consumos + cuotas del período abierto actual
-    const periodoAbierto = periodos.find(p => p.estado === 'abierto');
-    if (!periodoAbierto) return 0;
-    
-    // Usar los totales del período en lugar de sumar movimientos individuales
-    return (periodoAbierto.totalConsumos || 0) + (periodoAbierto.totalCuotas || 0);
+    return movimientos
+      .filter(m => !m.esSaldoAnterior)
+      .reduce((s, m) => s + (m.monto || 0), 0);
+  };
+
+  // Calcular total de pagos (en tiempo real)
+  const calcularTotalPagos = () => {
+    return pagos.reduce((s, p) => s + (p.monto || 0), 0);
   };
 
   const calcularSaldoDisponible = () => {
-    return totalIngresos - calcularTotalConsumos();
+    return totalIngresos - totalDeudas;
   };
 
   if (!user) {

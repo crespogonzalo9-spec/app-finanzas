@@ -1029,6 +1029,8 @@ const MonityApp = () => {
       </div>
     );
   };
+
+  const ModalEditarCuota = () => {
     const [desc, setDesc] = useState(cuotaEditar?.descripcion || '');
     const [monto, setMonto] = useState(cuotaEditar?.montoCuota?.toString() || '');
     const [total, setTotal] = useState(cuotaEditar?.cuotasTotales?.toString() || '');

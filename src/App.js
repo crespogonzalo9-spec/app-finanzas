@@ -1408,7 +1408,8 @@ const MonityApp = () => {
     );
   };
 
-  const tabs = [
+  const MonityApp = () => {
+    const tabs = [
     { id: 'dashboard', label: 'Inicio', icon: <Home className="w-5 h-5" /> },
     { id: 'stats', label: 'Stats', icon: <BarChart3 className="w-5 h-5" /> },
     { id: 'config', label: 'Config', icon: <Sliders className="w-5 h-5" /> }

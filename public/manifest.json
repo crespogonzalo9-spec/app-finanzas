@@ -1,23 +1,21 @@
 {
-  "name": "Monity - Control Financiero",
+  "name": "Monity - Control de Finanzas",
   "short_name": "Monity",
-  "description": "Tu asistente de finanzas personales para Argentina",
+  "description": "Aplicación de control de finanzas personales",
   "start_url": "/",
   "display": "standalone",
-  "orientation": "portrait",
-  "background_color": "#0f172a",
+  "background_color": "#111827",
   "theme_color": "#6366f1",
-  "categories": ["finance", "productivity"],
-  "lang": "es-AR",
+  "orientation": "portrait",
   "icons": [
     {
-      "src": "/logo192.png",
+      "src": "/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/logo512.png",
+      "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

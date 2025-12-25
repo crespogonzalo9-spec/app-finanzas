@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from 'firebase/auth';
-import { getFirestore, doc, setDoc, getDoc, collection, addDoc, getDocs, deleteDoc, updateDoc } from 'firebase/firestore';
-import { Calendar, PlusCircle, Home, ChevronRight, X, DollarSign, RefreshCw, CreditCard, ArrowDownCircle, ArrowUpCircle, LogOut, Sliders, Trash2, Moon, Sun, Minus, Plus, Repeat, Edit3, Bell, Download, BarChart3, Target, PieChart } from 'lucide-react';
+import { getFirestore, doc, collection, addDoc, getDocs, deleteDoc, updateDoc } from 'firebase/firestore';
+import { Calendar, PlusCircle, Home, ChevronRight, X, CreditCard, LogOut, Sliders, Trash2, Moon, Sun, Minus, Plus, Repeat, Edit3, Bell, BarChart3, CheckSquare, Square } from 'lucide-react';
 
 const MonityLogo = ({ size = 40 }) => (
   <svg width={size} height={size} viewBox="0 0 100 100">
@@ -27,72 +27,46 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const googleProvider = new GoogleAuthProvider();
 
-const BANCOS_ARGENTINA = [
+const BANCOS = [
   { id: 'galicia', nombre: 'Banco Galicia', color: '#FF6B00' },
   { id: 'santander', nombre: 'Banco Santander', color: '#EC0000' },
-  { id: 'bbva', nombre: 'BBVA Argentina', color: '#004481' },
+  { id: 'bbva', nombre: 'BBVA', color: '#004481' },
   { id: 'macro', nombre: 'Banco Macro', color: '#003399' },
   { id: 'nacion', nombre: 'Banco Nación', color: '#003366' },
   { id: 'provincia', nombre: 'Banco Provincia', color: '#006633' },
-  { id: 'ciudad', nombre: 'Banco Ciudad', color: '#1a1a6e' },
-  { id: 'hipotecario', nombre: 'Banco Hipotecario', color: '#FF6600' },
-  { id: 'icbc', nombre: 'ICBC Argentina', color: '#C8102E' },
-  { id: 'hsbc', nombre: 'HSBC Argentina', color: '#DB0011' },
-  { id: 'patagonia', nombre: 'Banco Patagonia', color: '#00529B' },
-  { id: 'supervielle', nombre: 'Banco Supervielle', color: '#00A551' },
+  { id: 'icbc', nombre: 'ICBC', color: '#C8102E' },
+  { id: 'hsbc', nombre: 'HSBC', color: '#DB0011' },
   { id: 'brubank', nombre: 'Brubank', color: '#6B21A8' },
-  { id: 'rebanking', nombre: 'Rebanking', color: '#00C389' },
-  { id: 'del_sol', nombre: 'Banco del Sol', color: '#FFB800' },
-  { id: 'no_bancaria', nombre: 'Entidad No Bancaria', color: '#8B5E3C' },
-];
-
-const BILLETERAS_VIRTUALES = [
-  { id: 'mercadopago', nombre: 'Mercado Pago', color: '#00BCFF' },
   { id: 'uala', nombre: 'Ualá', color: '#FF3366' },
-  { id: 'naranja_x', nombre: 'Naranja X', color: '#FF6600' },
-  { id: 'personal_pay', nombre: 'Personal Pay', color: '#0066CC' },
-  { id: 'modo', nombre: 'MODO', color: '#00D4AA' },
-  { id: 'cuenta_dni', nombre: 'Cuenta DNI', color: '#006633' },
-  { id: 'prex', nombre: 'Prex', color: '#00C853' },
-  { id: 'lemon', nombre: 'Lemon Cash', color: '#FFE500' },
-  { id: 'belo', nombre: 'Belo', color: '#5865F2' },
-  { id: 'claro_pay', nombre: 'Claro Pay', color: '#DA291C' },
-  { id: 'otros', nombre: 'Otros', color: '#7A869A' },
+  { id: 'mercadopago', nombre: 'Mercado Pago', color: '#00BCFF' },
+  { id: 'naranja', nombre: 'Naranja X', color: '#FF6600' },
+  { id: 'otros', nombre: 'Otros', color: '#6B7280' },
 ];
 
 const TIPOS_CUENTA = [
   { id: 'tarjeta_credito', nombre: 'Tarjeta de Crédito', icon: '💳' },
-  { id: 'prestamo_personal', nombre: 'Préstamo Personal', icon: '🏦' },
-  { id: 'prestamo_hipotecario', nombre: 'Préstamo Hipotecario', icon: '🏠' },
-  { id: 'linea_credito', nombre: 'Línea de Crédito', icon: '💰' },
+  { id: 'prestamo', nombre: 'Préstamo', icon: '🏦' },
   { id: 'cuenta_corriente', nombre: 'Cuenta Corriente', icon: '📋' },
   { id: 'otros', nombre: 'Otros', icon: '📦' },
 ];
 
 const CATEGORIAS = [
-  { id: 'supermercado', nombre: 'Supermercado', icon: '🛒', color: '#22c55e' },
-  { id: 'restaurantes', nombre: 'Restaurantes', icon: '🍔', color: '#f43f5e' },
-  { id: 'transporte', nombre: 'Transporte', icon: '🚗', color: '#3b82f6' },
-  { id: 'combustible', nombre: 'Combustible', icon: '⛽', color: '#0ea5e9' },
-  { id: 'servicios', nombre: 'Servicios', icon: '💡', color: '#eab308' },
-  { id: 'entretenimiento', nombre: 'Entretenimiento', icon: '🎬', color: '#a855f7' },
-  { id: 'salud', nombre: 'Salud', icon: '🏥', color: '#ef4444' },
-  { id: 'suscripciones', nombre: 'Suscripciones', icon: '📱', color: '#84cc16' },
-  { id: 'cuota', nombre: 'Cuota', icon: '🔄', color: '#8b5cf6' },
-  { id: 'ropa', nombre: 'Ropa', icon: '👕', color: '#ec4899' },
-  { id: 'educacion', nombre: 'Educación', icon: '📚', color: '#14b8a6' },
-  { id: 'hogar', nombre: 'Hogar', icon: '🏠', color: '#f97316' },
-  { id: 'otros', nombre: 'Otros', icon: '📦', color: '#78716c' },
+  { id: 'supermercado', nombre: 'Supermercado', icon: '🛒' },
+  { id: 'restaurantes', nombre: 'Restaurantes', icon: '🍔' },
+  { id: 'transporte', nombre: 'Transporte', icon: '🚗' },
+  { id: 'servicios', nombre: 'Servicios', icon: '💡' },
+  { id: 'entretenimiento', nombre: 'Entretenimiento', icon: '🎬' },
+  { id: 'salud', nombre: 'Salud', icon: '🏥' },
+  { id: 'cuota', nombre: 'Cuota', icon: '🔄' },
+  { id: 'otros', nombre: 'Otros', icon: '📦' },
 ];
 
-const TODAS_ENTIDADES = [...BANCOS_ARGENTINA, ...BILLETERAS_VIRTUALES];
 const formatCurrency = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(n || 0);
-const formatDateShort = (d) => d ? new Date(d + 'T12:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: 'short' }) : '-';
-const formatDateFull = (d) => d ? new Date(d + 'T12:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-';
+const formatDate = (d) => d ? new Date(d + 'T12:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: 'short' }) : '-';
 
 const EntidadLogo = ({ entidad, size = 40 }) => {
-  const found = TODAS_ENTIDADES.find(e => e.nombre === entidad);
-  const initials = entidad ? entidad.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase() : '??';
+  const found = BANCOS.find(e => e.nombre === entidad);
+  const initials = entidad ? entidad.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() : '??';
   return (
     <div className="rounded-xl flex items-center justify-center text-white font-bold shadow-sm"
       style={{ width: size, height: size, backgroundColor: found?.color || '#6366f1', fontSize: size * 0.35 }}>
@@ -101,649 +75,413 @@ const EntidadLogo = ({ entidad, size = 40 }) => {
   );
 };
 
-const DatePicker = ({ label, value, onChange, darkMode, theme }) => (
+const DateInput = ({ label, value, onChange, theme }) => (
   <div>
-    {label && <label className={`text-sm ${theme.textMuted}`}>{label}</label>}
-    <input type="date" value={value} onChange={e => onChange(e.target.value)} className={`w-full p-3 border rounded-xl ${theme.input}`} />
+    <label className={`text-sm ${theme.textMuted}`}>{label}</label>
+    <input type="date" value={value || ''} onChange={e => onChange(e.target.value)} className={`w-full p-3 border rounded-xl ${theme.input}`} />
   </div>
 );
 
 const MonityApp = () => {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [dataLoading, setDataLoading] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(true);
   const [tab, setTab] = useState('dashboard');
+  const [modal, setModal] = useState(null);
   const [cuentas, setCuentas] = useState([]);
-  const [cuentaActiva, setCuentaActiva] = useState(null);
   const [movimientos, setMovimientos] = useState([]);
   const [pagos, setPagos] = useState([]);
-  const [periodos, setPeriodos] = useState([]);
   const [cuotas, setCuotas] = useState([]);
-  const [debitosAutomaticos, setDebitosAutomaticos] = useState([]);
-  const [modal, setModal] = useState(null);
-  const [modalCerrarPeriodo, setModalCerrarPeriodo] = useState(null);
-  const [pagoAlCerrar, setPagoAlCerrar] = useState('');
-  const [alertaActiva, setAlertaActiva] = useState(null);
-  const [movimientoEditar, setMovimientoEditar] = useState(null);
-  const [cuotaEditar, setCuotaEditar] = useState(null);
+  const [cuentaActiva, setCuentaActiva] = useState(null);
   const [cuentaEditar, setCuentaEditar] = useState(null);
+  const [movEditar, setMovEditar] = useState(null);
   const [pagoEditar, setPagoEditar] = useState(null);
-  const [config, setConfig] = useState({ alertaGastoAlto: false, montoAlertaGasto: 10000, alertaPorcentaje: false, porcentajeAlerta: 80 });
-  const [versionActual, setVersionActual] = useState('1.0.0');
-  const [actualizacionDisponible, setActualizacionDisponible] = useState(false);
-  const [ultimaVerificacion, setUltimaVerificacion] = useState(null);
+  const [cuotaEditar, setCuotaEditar] = useState(null);
+  const [modalCierre, setModalCierre] = useState(null);
 
-  const theme = {
-    bg: darkMode ? 'bg-gray-900' : 'bg-slate-50',
-    text: darkMode ? 'text-white' : 'text-slate-900',
-    textMuted: darkMode ? 'text-gray-400' : 'text-slate-500',
-    border: darkMode ? 'border-gray-700' : 'border-slate-200',
-    input: darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-slate-300 text-slate-900',
-    hover: darkMode ? 'hover:bg-gray-700' : 'hover:bg-slate-100',
-    card: darkMode ? 'bg-gray-800' : 'bg-white',
+  const theme = darkMode ? {
+    bg: 'bg-gray-900', card: 'bg-gray-800', text: 'text-white', textMuted: 'text-gray-400',
+    border: 'border-gray-700', input: 'bg-gray-700 border-gray-600 text-white', hover: 'hover:bg-gray-700'
+  } : {
+    bg: 'bg-gray-100', card: 'bg-white', text: 'text-gray-900', textMuted: 'text-gray-500',
+    border: 'border-gray-200', input: 'bg-white border-gray-300 text-gray-900', hover: 'hover:bg-gray-100'
   };
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (u) => {
-      if (u) {
-        setUser(u);
-        await cargarDatos(u.uid);
-      } else {
-        setUser(null);
-      }
-      setLoading(false);
-    });
-    return () => unsubscribe();
+    const unsub = onAuthStateChanged(auth, u => { setUser(u); if (u) cargarDatos(u.uid); });
+    return () => unsub();
   }, []);
-
-  // SOLUCIÓN 1 Y 2: Verificar actualizaciones
-  useEffect(() => {
-    // Verificar actualizaciones cada vez que la app se abre
-    verificarActualizacion();
-
-    // SOLUCIÓN 2: Verificar en background cada 6 horas
-    const intervalo = setInterval(() => {
-      verificarActualizacion();
-    }, 6 * 60 * 60 * 1000); // 6 horas
-
-    return () => clearInterval(intervalo);
-  }, []);
-
-  const verificarActualizacion = async () => {
-    try {
-      // Intentar obtener la versión del servidor
-      // Usamos un archivo version.json o un endpoint
-      const response = await fetch('/version.json?t=' + Date.now());
-      
-      if (response.ok) {
-        const versionData = await response.json();
-        const versionServidor = versionData.version || '1.0.0';
-        
-        setUltimaVerificacion(new Date());
-        
-        // Comparar versiones
-        if (versionServidor !== versionActual) {
-          setActualizacionDisponible(true);
-          setVersionActual(versionServidor);
-          
-          // Guardar que hay actualización disponible
-          if (user) {
-            try {
-              await setDoc(doc(db, 'users', user.uid, 'config', 'general'), 
-                { ultimaActualizacionDisponible: new Date().toISOString() }, 
-                { merge: true }
-              );
-            } catch (e) {
-              console.log('No se pudo guardar fecha de actualización');
-            }
-          }
-        }
-      }
-    } catch (e) {
-      // Si no puede conectar o no existe el archivo, es normal
-      console.log('No se pudo verificar actualización:', e.message);
-    }
-  };
-
-  const aplicarActualizacion = () => {
-    // Limpiar el cache y recargar
-    if ('caches' in window) {
-      caches.keys().then(cacheNames => {
-        cacheNames.forEach(cacheName => {
-          caches.delete(cacheName);
-        });
-      });
-    }
-
-    // Limpiar localStorage si es necesario
-    sessionStorage.clear();
-
-    // Recargar la página
-    window.location.href = window.location.href;
-  };
 
   const cargarDatos = async (uid) => {
-    setDataLoading(true);
-    try {
-      const [c, m, p, pe, cu, cfg, deb] = await Promise.all([
-        getDocs(collection(db, 'users', uid, 'cuentas')),
-        getDocs(collection(db, 'users', uid, 'movimientos')),
-        getDocs(collection(db, 'users', uid, 'pagos')),
-        getDocs(collection(db, 'users', uid, 'periodos')),
-        getDocs(collection(db, 'users', uid, 'cuotas')),
-        getDoc(doc(db, 'users', uid, 'config', 'general')),
-        getDocs(collection(db, 'users', uid, 'debitosAutomaticos')),
-      ]);
-      setCuentas(c.docs.map(d => ({ id: d.id, ...d.data() })));
-      setMovimientos(m.docs.map(d => ({ id: d.id, ...d.data() })));
-      setPagos(p.docs.map(d => ({ id: d.id, ...d.data() })));
-      setPeriodos(pe.docs.map(d => ({ id: d.id, ...d.data() })));
-      setCuotas(cu.docs.map(d => ({ id: d.id, ...d.data() })));
-      setDebitosAutomaticos(deb.docs.map(d => ({ id: d.id, ...d.data() })));
-      if (cfg.exists()) setConfig(prev => ({ ...prev, ...cfg.data() }));
-    } catch (e) { console.error(e); }
-    setDataLoading(false);
+    const [cSnap, mSnap, pSnap, qSnap] = await Promise.all([
+      getDocs(collection(db, 'users', uid, 'cuentas')),
+      getDocs(collection(db, 'users', uid, 'movimientos')),
+      getDocs(collection(db, 'users', uid, 'pagos')),
+      getDocs(collection(db, 'users', uid, 'cuotas'))
+    ]);
+    setCuentas(cSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+    setMovimientos(mSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+    setPagos(pSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+    setCuotas(qSnap.docs.map(d => ({ id: d.id, ...d.data() })));
   };
 
-  const guardarConfig = async (c) => { if (user) { await setDoc(doc(db, 'users', user.uid, 'config', 'general'), c); setConfig(c); } };
-  
-  const guardarCuenta = async (cuenta) => {
+  // CRUD Functions
+  const guardarCuenta = async (datos) => {
     if (!user) return;
-    if (cuentaEditar) {
-      // Editar cuenta existente
-      await updateDoc(doc(db, 'users', user.uid, 'cuentas', cuentaEditar.id), cuenta);
-      setCuentas(cuentas.map(c => c.id === cuentaEditar.id ? { ...c, ...cuenta } : c));
-    } else {
-      // Nueva cuenta
-      const ref = await addDoc(collection(db, 'users', user.uid, 'cuentas'), cuenta);
-      const nueva = { ...cuenta, id: ref.id };
-      setCuentas([...cuentas, nueva]);
-      if (cuenta.fechaCierre && cuenta.fechaCierreAnterior) {
-        await guardarPeriodo({ cuentaId: ref.id, fechaInicio: cuenta.fechaCierreAnterior, fechaCierre: cuenta.fechaCierre, estado: 'abierto', saldoInicial: 0 });
-      }
-    }
-    setCuentaEditar(null);
+    const ref = await addDoc(collection(db, 'users', user.uid, 'cuentas'), datos);
+    setCuentas([...cuentas, { id: ref.id, ...datos }]);
+    return ref.id;
+  };
+
+  const actualizarCuenta = async (id, datos) => {
+    if (!user) return;
+    await updateDoc(doc(db, 'users', user.uid, 'cuentas', id), datos);
+    setCuentas(cuentas.map(c => c.id === id ? { ...c, ...datos } : c));
   };
 
   const eliminarCuenta = async (id) => {
     if (!user) return;
     await deleteDoc(doc(db, 'users', user.uid, 'cuentas', id));
+    for (const m of movimientos.filter(m => m.cuentaId === id)) {
+      await deleteDoc(doc(db, 'users', user.uid, 'movimientos', m.id));
+    }
+    for (const p of pagos.filter(p => p.cuentaId === id)) {
+      await deleteDoc(doc(db, 'users', user.uid, 'pagos', p.id));
+    }
     setCuentas(cuentas.filter(c => c.id !== id));
-    for (const m of movimientos.filter(m => m.cuentaId === id)) await deleteDoc(doc(db, 'users', user.uid, 'movimientos', m.id));
     setMovimientos(movimientos.filter(m => m.cuentaId !== id));
+    setPagos(pagos.filter(p => p.cuentaId !== id));
   };
 
-  const guardarMovimiento = async (mov) => {
+  const guardarMovimiento = async (datos) => {
     if (!user) return;
-    
-    if (config.alertaGastoAlto && mov.monto >= config.montoAlertaGasto) {
-      setAlertaActiva({ mensaje: `Gasto de ${formatCurrency(mov.monto)} supera tu límite de ${formatCurrency(config.montoAlertaGasto)}` });
-    }
-    
-    if (config.alertaPorcentaje && totalIngresos > 0) {
-      const gastosActuales = movimientos.reduce((s, m) => s + (m.monto || 0), 0);
-      const nuevoTotalGastos = gastosActuales + mov.monto;
-      const porcentajeGastado = (nuevoTotalGastos / totalIngresos) * 100;
-      
-      if (porcentajeGastado >= config.porcentajeAlerta) {
-        setAlertaActiva({ 
-          mensaje: `¡Atención! Has gastado el ${Math.round(porcentajeGastado)}% de tus ingresos (${formatCurrency(nuevoTotalGastos)} de ${formatCurrency(totalIngresos)})` 
-        });
-      }
-    }
-    
-    const ref = await addDoc(collection(db, 'users', user.uid, 'movimientos'), mov);
-    setMovimientos([...movimientos, { ...mov, id: ref.id }]);
+    const ref = await addDoc(collection(db, 'users', user.uid, 'movimientos'), { ...datos, createdAt: new Date().toISOString() });
+    setMovimientos([...movimientos, { id: ref.id, ...datos }]);
     return ref.id;
   };
 
-  const actualizarMovimiento = async (id, datos) => { if (user) { await updateDoc(doc(db, 'users', user.uid, 'movimientos', id), datos); setMovimientos(movimientos.map(m => m.id === id ? { ...m, ...datos } : m)); } };
-  const eliminarMovimiento = async (id) => { if (user) { await deleteDoc(doc(db, 'users', user.uid, 'movimientos', id)); setMovimientos(movimientos.filter(m => m.id !== id)); } };
-  const guardarPago = async (p) => { if (!user) return; const ref = await addDoc(collection(db, 'users', user.uid, 'pagos'), p); setPagos([...pagos, { ...p, id: ref.id }]); return ref.id; };
-  const actualizarPago = async (id, datos) => { if (user) { await updateDoc(doc(db, 'users', user.uid, 'pagos', id), datos); setPagos(pagos.map(p => p.id === id ? { ...p, ...datos } : p)); } };
-  const eliminarPago = async (id) => { if (user) { await deleteDoc(doc(db, 'users', user.uid, 'pagos', id)); setPagos(pagos.filter(p => p.id !== id)); } };
-  const guardarPeriodo = async (p) => { if (!user) return; const ref = await addDoc(collection(db, 'users', user.uid, 'periodos'), p); const n = { ...p, id: ref.id }; setPeriodos([...periodos, n]); return n; };
-  const guardarCuota = async (c) => { if (!user) return; const ref = await addDoc(collection(db, 'users', user.uid, 'cuotas'), c); setCuotas([...cuotas, { ...c, id: ref.id }]); return ref.id; };
-  const actualizarCuota = async (id, datos) => { if (user) { await updateDoc(doc(db, 'users', user.uid, 'cuotas', id), datos); setCuotas(cuotas.map(c => c.id === id ? { ...c, ...datos } : c)); } };
-  
+  const actualizarMovimiento = async (id, datos) => {
+    if (!user) return;
+    await updateDoc(doc(db, 'users', user.uid, 'movimientos', id), datos);
+    setMovimientos(movimientos.map(m => m.id === id ? { ...m, ...datos } : m));
+  };
+
+  const eliminarMovimiento = async (id) => {
+    if (!user) return;
+    await deleteDoc(doc(db, 'users', user.uid, 'movimientos', id));
+    setMovimientos(movimientos.filter(m => m.id !== id));
+  };
+
+  const guardarPago = async (datos) => {
+    if (!user) return;
+    const ref = await addDoc(collection(db, 'users', user.uid, 'pagos'), { ...datos, createdAt: new Date().toISOString() });
+    setPagos([...pagos, { id: ref.id, ...datos }]);
+    return ref.id;
+  };
+
+  const actualizarPago = async (id, datos) => {
+    if (!user) return;
+    await updateDoc(doc(db, 'users', user.uid, 'pagos', id), datos);
+    setPagos(pagos.map(p => p.id === id ? { ...p, ...datos } : p));
+  };
+
+  const eliminarPago = async (id) => {
+    if (!user) return;
+    await deleteDoc(doc(db, 'users', user.uid, 'pagos', id));
+    setPagos(pagos.filter(p => p.id !== id));
+  };
+
+  const guardarCuota = async (datos) => {
+    if (!user) return;
+    const ref = await addDoc(collection(db, 'users', user.uid, 'cuotas'), datos);
+    setCuotas([...cuotas, { id: ref.id, ...datos }]);
+    return ref.id;
+  };
+
+  const actualizarCuota = async (id, datos) => {
+    if (!user) return;
+    await updateDoc(doc(db, 'users', user.uid, 'cuotas', id), datos);
+    setCuotas(cuotas.map(c => c.id === id ? { ...c, ...datos } : c));
+  };
+
   const eliminarCuota = async (id) => {
     if (!user) return;
     await deleteDoc(doc(db, 'users', user.uid, 'cuotas', id));
     setCuotas(cuotas.filter(c => c.id !== id));
-    for (const m of movimientos.filter(m => m.cuotaId === id)) await deleteDoc(doc(db, 'users', user.uid, 'movimientos', m.id));
+    for (const m of movimientos.filter(m => m.cuotaId === id)) {
+      await deleteDoc(doc(db, 'users', user.uid, 'movimientos', m.id));
+    }
     setMovimientos(movimientos.filter(m => m.cuotaId !== id));
   };
 
-  // NUEVAS FUNCIONES PARA DÉBITOS AUTOMÁTICOS
-  const guardarDebito = async (datos) => {
-    if (!user) return;
-    // Guardar el débito automático
-    const ref = await addDoc(collection(db, 'users', user.uid, 'debitosAutomaticos'), datos);
-    setDebitosAutomaticos([...debitosAutomaticos, { id: ref.id, ...datos }]);
-    
-    // IMPACTAR INMEDIATAMENTE EN EL PERÍODO ACTUAL
-    const cuenta = cuentas.find(c => c.id === datos.cuentaId);
-    const periodo = periodos.find(p => p.cuentaId === datos.cuentaId && p.estado === 'abierto');
-    
-    if (cuenta && periodo) {
-      // Crear movimiento en el período actual con la fecha actual
-      const movData = {
-        cuentaId: datos.cuentaId,
-        descripcion: `${datos.descripcion} (Débito Automático)`,
-        monto: datos.monto,
-        categoria: datos.categoria || 'otros',
-        fecha: new Date().toISOString().slice(0, 10),
-        tipo: 'consumo',
-        esDebito: true,
-        debitoAutomaticoId: ref.id
-      };
-      await guardarMovimiento(movData);
-    }
-  };
-
-  const actualizarDebito = async (id, datos) => {
-    if (!user) return;
-    await updateDoc(doc(db, 'users', user.uid, 'debitosAutomaticos', id), datos);
-    setDebitosAutomaticos(debitosAutomaticos.map(d => d.id === id ? { ...d, ...datos } : d));
-  };
-
-  const eliminarDebito = async (id) => {
-    if (!user) return;
-    await deleteDoc(doc(db, 'users', user.uid, 'debitosAutomaticos', id));
-    setDebitosAutomaticos(debitosAutomaticos.filter(d => d.id !== id));
-  };
-
-  const cerrarPeriodo = async (cuentaId, montoPago = 0) => {
-    if (!user) return;
-    
-    const cuenta = cuentas.find(c => c.id === cuentaId);
-    const periodo = periodos.find(p => p.cuentaId === cuentaId && p.estado === 'abierto');
-    
-    if (!cuenta || !periodo) return;
-
-    // Calcular saldo del período actual EN TIEMPO REAL
-    const consumosPeriodo = movimientos
-      .filter(m => m.cuentaId === cuentaId && !m.esSaldoAnterior)
-      .reduce((s, m) => s + (m.monto || 0), 0);
-    
-    const pagosPeriodo = pagos
-      .filter(p => p.cuentaId === cuentaId && !p.esParaDeuda)
-      .reduce((s, p) => s + (p.monto || 0), 0);
-    
-    const saldoPeriodoActual = consumosPeriodo - pagosPeriodo;
-    
-    // Deuda anterior de la cuenta
-    const deudaAnterior = cuenta.deudaAcumulada || 0;
-    
-    // Aplicar pago al cerrar (si hay)
-    let saldoDespuesDePago = saldoPeriodoActual;
-    if (montoPago > 0) {
-      saldoDespuesDePago = Math.max(0, saldoPeriodoActual - montoPago);
-      
-      // Registrar el pago
-      await guardarPago({
-        cuentaId,
-        descripcion: 'Pago al cerrar período',
-        monto: montoPago,
-        fecha: new Date().toISOString().slice(0, 10),
-        esParaDeuda: false
-      });
-    }
-    
-    // Lo que queda sin pagar se suma a la deuda acumulada
-    const nuevaDeudaAcumulada = deudaAnterior + saldoDespuesDePago;
-
-    // Cerrar período actual
-    await updateDoc(doc(db, 'users', user.uid, 'periodos', periodo.id), {
-      estado: 'cerrado',
-      totalConsumos: consumosPeriodo,
-      totalPagos: pagosPeriodo + montoPago,
-      saldoFinal: saldoDespuesDePago,
-      fechaCierreReal: new Date().toISOString().slice(0, 10)
-    });
-
-    // Actualizar deuda acumulada en la cuenta
-    await updateDoc(doc(db, 'users', user.uid, 'cuentas', cuentaId), { 
-      deudaAcumulada: nuevaDeudaAcumulada
-    });
-
-    // Crear nuevo período (empieza en 0, la deuda está en la cuenta)
-    const hoy = new Date();
-    const proximoMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 1);
-    const finProximoMes = new Date(proximoMes.getFullYear(), proximoMes.getMonth() + 1, 0);
-
-    const nuevoP = await addDoc(collection(db, 'users', user.uid, 'periodos'), {
-      cuentaId,
-      fechaInicio: hoy.toISOString().slice(0, 10),
-      fechaCierre: finProximoMes.toISOString().slice(0, 10),
-      estado: 'abierto',
-      saldoInicial: 0, // Empieza en 0, la deuda está en cuenta.deudaAcumulada
-      totalConsumos: 0,
-      totalCuotas: 0,
-      totalPagos: 0,
-      saldoFinal: 0,
-      createdAt: new Date().toISOString()
-    });
-
-    // Procesar cuotas activas - generar movimiento para el nuevo período
-    for (const cuota of cuotas.filter(c => c.cuentaId === cuentaId && c.cuotasPendientes > 0 && c.estado === 'activa')) {
-      const numeroCuota = cuota.cuotasTotales - cuota.cuotasPendientes + 1;
-      
-      await addDoc(collection(db, 'users', user.uid, 'movimientos'), { 
-        cuentaId, 
-        descripcion: `${cuota.descripcion} (${numeroCuota}/${cuota.cuotasTotales})`, 
-        monto: cuota.montoCuota, 
-        categoria: 'cuota', 
-        fecha: hoy.toISOString().slice(0, 10), 
-        esCuota: true, 
-        cuotaId: cuota.id,
-        createdAt: new Date().toISOString()
-      });
-      
-      await updateDoc(doc(db, 'users', user.uid, 'cuotas', cuota.id), { 
-        cuotasPendientes: cuota.cuotasPendientes - 1, 
-        estado: cuota.cuotasPendientes - 1 <= 0 ? 'finalizada' : 'activa' 
-      });
-    }
-
-    // Procesar débitos automáticos
-    const debitosParaCuenta = debitosAutomaticos.filter(d => d.cuentaId === cuentaId);
-    for (const debito of debitosParaCuenta) {
-      await addDoc(collection(db, 'users', user.uid, 'movimientos'), { 
-        cuentaId, 
-        descripcion: `${debito.descripcion} (Débito Automático)`, 
-        monto: debito.monto, 
-        categoria: debito.categoria || 'servicios', 
-        fecha: hoy.toISOString().slice(0, 10), 
-        tipo: 'consumo',
-        esDebito: true, 
-        debitoAutomaticoId: debito.id,
-        createdAt: new Date().toISOString()
-      });
-    }
-    
-    setModalCerrarPeriodo(null);
-    setPagoAlCerrar('');
-    await cargarDatos(user.uid);
-  };
-
-  const handleLogout = async () => { await signOut(auth); setUser(null); };
+  // CÁLCULOS CORREGIDOS
   const cuentasIngreso = cuentas.filter(c => c.tipo === 'ingreso');
   const cuentasContables = cuentas.filter(c => c.tipo === 'contable');
   const totalIngresos = cuentasIngreso.reduce((s, c) => s + (c.montoMensual || 0), 0);
-  
-  // NUEVA LÓGICA: Separar DEUDA (períodos vencidos) de CONSUMOS (período actual)
-  
-  // Obtener deuda acumulada de una cuenta (lo que quedó sin pagar de períodos anteriores)
-  const obtenerDeudaAcumulada = (cuentaId) => {
+
+  // Período actual: entre cierreAnterior y cierreActual
+  const getPeriodo = (cuenta) => ({
+    inicio: cuenta.cierreAnterior || '2020-01-01',
+    fin: cuenta.cierreActual || new Date().toISOString().slice(0, 10)
+  });
+
+  // Consumos del período (solo movimientos dentro del período, no pagados)
+  const getConsumosPeriodo = (cuentaId) => {
+    const cuenta = cuentas.find(c => c.id === cuentaId);
+    if (!cuenta) return 0;
+    const p = getPeriodo(cuenta);
+    return movimientos
+      .filter(m => m.cuentaId === cuentaId && m.fecha >= p.inicio && m.fecha <= p.fin && !m.periodoCerrado)
+      .reduce((s, m) => s + (m.monto || 0), 0);
+  };
+
+  // Pagos del período (no de deuda)
+  const getPagosPeriodo = (cuentaId) => {
+    const cuenta = cuentas.find(c => c.id === cuentaId);
+    if (!cuenta) return 0;
+    const p = getPeriodo(cuenta);
+    return pagos
+      .filter(pg => pg.cuentaId === cuentaId && !pg.esParaDeuda && pg.fecha >= p.inicio && pg.fecha <= p.fin)
+      .reduce((s, pg) => s + (pg.monto || 0), 0);
+  };
+
+  // Saldo del período
+  const getSaldoPeriodo = (cuentaId) => getConsumosPeriodo(cuentaId) - getPagosPeriodo(cuentaId);
+
+  // Deuda acumulada (guardada en cuenta)
+  const getDeuda = (cuentaId) => {
     const cuenta = cuentas.find(c => c.id === cuentaId);
     return cuenta?.deudaAcumulada || 0;
   };
 
-  // Calcular consumos del período actual (solo movimientos, sin contar deuda anterior)
-  const calcularConsumosPeriodo = (cuentaId) => {
-    return movimientos
-      .filter(m => m.cuentaId === cuentaId && !m.esSaldoAnterior)
-      .reduce((s, m) => s + (m.monto || 0), 0);
+  // Pagos a deuda
+  const getPagosDeuda = (cuentaId) => pagos.filter(p => p.cuentaId === cuentaId && p.esParaDeuda).reduce((s, p) => s + (p.monto || 0), 0);
+
+  // Deuda real
+  const getDeudaReal = (cuentaId) => Math.max(0, getDeuda(cuentaId) - getPagosDeuda(cuentaId));
+
+  // Total
+  const getTotal = (cuentaId) => getDeudaReal(cuentaId) + getSaldoPeriodo(cuentaId);
+
+  // Totales globales
+  const totalDeuda = cuentasContables.reduce((s, c) => s + getDeudaReal(c.id), 0);
+  const totalConsumos = cuentasContables.reduce((s, c) => s + Math.max(0, getSaldoPeriodo(c.id)), 0);
+  const disponible = totalIngresos - totalDeuda - totalConsumos;
+
+  // Cerrar período
+  const cerrarPeriodo = async (cuenta, montoPago, cierreProx, vencProx) => {
+    const saldo = getSaldoPeriodo(cuenta.id);
+    const deudaAnt = getDeuda(cuenta.id);
+    
+    if (montoPago > 0) {
+      await guardarPago({ cuentaId: cuenta.id, descripcion: 'Pago cierre período', monto: montoPago, fecha: new Date().toISOString().slice(0,10), esParaDeuda: false });
+    }
+    
+    const saldoRestante = Math.max(0, saldo - montoPago);
+    const nuevaDeuda = deudaAnt + saldoRestante;
+
+    // Marcar movimientos como cerrados
+    const p = getPeriodo(cuenta);
+    for (const m of movimientos.filter(m => m.cuentaId === cuenta.id && m.fecha >= p.inicio && m.fecha <= p.fin)) {
+      await actualizarMovimiento(m.id, { periodoCerrado: true });
+    }
+
+    // Rotar fechas y actualizar deuda
+    await actualizarCuenta(cuenta.id, {
+      deudaAcumulada: nuevaDeuda,
+      cierreAnterior: cuenta.cierreActual,
+      cierreActual: cuenta.cierreProximo || cierreProx,
+      cierreProximo: cierreProx || '',
+      vencimientoAnterior: cuenta.vencimientoActual,
+      vencimientoActual: cuenta.vencimientoProximo || vencProx,
+      vencimientoProximo: vencProx || ''
+    });
+
+    // Generar cuotas del nuevo período
+    for (const cuota of cuotas.filter(c => c.cuentaId === cuenta.id && c.cuotasPendientes > 0 && c.estado === 'activa')) {
+      const num = cuota.cuotasTotales - cuota.cuotasPendientes + 1;
+      await guardarMovimiento({
+        cuentaId: cuenta.id, descripcion: `${cuota.descripcion} (${num}/${cuota.cuotasTotales})`,
+        monto: cuota.montoCuota, categoria: 'cuota', fecha: new Date().toISOString().slice(0,10), esCuota: true, cuotaId: cuota.id
+      });
+      await actualizarCuota(cuota.id, { cuotasPendientes: cuota.cuotasPendientes - 1, estado: cuota.cuotasPendientes - 1 <= 0 ? 'finalizada' : 'activa' });
+    }
+
+    setModalCierre(null);
+    await cargarDatos(user.uid);
   };
 
-  // Calcular pagos del período actual (los que NO son para deuda)
-  const calcularPagosPeriodo = (cuentaId) => {
-    return pagos
-      .filter(p => p.cuentaId === cuentaId && !p.esParaDeuda)
-      .reduce((s, p) => s + (p.monto || 0), 0);
-  };
-
-  // Calcular pagos de deuda (los que SÍ son para deuda anterior)
-  const calcularPagosDeuda = (cuentaId) => {
-    return pagos
-      .filter(p => p.cuentaId === cuentaId && p.esParaDeuda)
-      .reduce((s, p) => s + (p.monto || 0), 0);
-  };
-
-  // Saldo a pagar del período actual = Consumos - Pagos del período
-  const calcularSaldoPeriodo = (cuentaId) => {
-    return calcularConsumosPeriodo(cuentaId) - calcularPagosPeriodo(cuentaId);
-  };
-
-  // Deuda real = Deuda acumulada - Pagos de deuda
-  const calcularDeudaReal = (cuentaId) => {
-    return Math.max(0, obtenerDeudaAcumulada(cuentaId) - calcularPagosDeuda(cuentaId));
-  };
-
-  // Saldo total de la cuenta = Deuda + Saldo del período
-  const calcularSaldo = (cuentaId) => {
-    return calcularDeudaReal(cuentaId) + calcularSaldoPeriodo(cuentaId);
-  };
-
-  // Total de DEUDA (solo períodos vencidos no pagados)
-  const totalDeudas = cuentasContables.reduce((s, c) => s + calcularDeudaReal(c.id), 0);
-  
-  // Total de CONSUMOS del período actual
-  const totalConsumosPeriodo = cuentasContables.reduce((s, c) => s + calcularConsumosPeriodo(c.id), 0);
-
-  // Saldo disponible = Ingresos - Deuda acumulada
-  const calcularSaldoDisponible = () => {
-    return totalIngresos - totalDeudas;
-  };
-
+  // LOGIN
   if (!user) {
     return (
       <div className={`min-h-screen flex items-center justify-center ${theme.bg}`}>
         <div className="text-center">
           <MonityLogo size={80} />
-          <h1 className={`text-4xl font-bold mb-8 ${theme.text}`}>Monity</h1>
-          <button onClick={() => signInWithPopup(auth, googleProvider)} className="px-8 py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700">
-            Iniciar sesión con Google
+          <h1 className={`text-2xl font-bold mt-4 ${theme.text}`}>Monity</h1>
+          <p className={`${theme.textMuted} mb-6`}>Control de Finanzas</p>
+          <button onClick={() => signInWithPopup(auth, googleProvider)} className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-medium">
+            Iniciar con Google
           </button>
         </div>
       </div>
     );
   }
 
-  if (dataLoading) return <div className={`min-h-screen flex items-center justify-center ${theme.bg}`}><RefreshCw className="w-8 h-8 animate-spin text-indigo-500" /></div>;
-
+  // DASHBOARD
   const Dashboard = () => (
     <div className="space-y-6">
-      {/* TARJETAS DE RESUMEN */}
       <div className="grid grid-cols-2 gap-4">
-        <div className={`p-4 rounded-2xl ${darkMode ? 'bg-emerald-900' : 'bg-emerald-50'}`}>
-          <div className={`text-sm font-medium ${darkMode ? 'text-emerald-200' : 'text-emerald-700'}`}>Ingresos</div>
+        <button onClick={() => setModal('ingreso')} className={`p-4 rounded-2xl text-left ${darkMode ? 'bg-emerald-900' : 'bg-emerald-50'}`}>
+          <div className={`text-sm ${darkMode ? 'text-emerald-200' : 'text-emerald-700'}`}>Ingresos</div>
           <div className={`text-2xl font-bold ${darkMode ? 'text-emerald-300' : 'text-emerald-600'}`}>{formatCurrency(totalIngresos)}</div>
-        </div>
-        <button onClick={() => setModal('detalleDeudas')} className={`p-4 rounded-2xl cursor-pointer transition-all hover:shadow-lg text-left ${darkMode ? 'bg-rose-900 hover:bg-rose-800' : 'bg-rose-50 hover:bg-rose-100'}`}>
-          <div className={`text-sm font-medium ${darkMode ? 'text-rose-200' : 'text-rose-700'}`}>Deuda Vencida</div>
-          <div className={`text-2xl font-bold ${darkMode ? 'text-rose-300' : 'text-rose-600'}`}>{formatCurrency(totalDeudas)}</div>
-          <div className={`text-xs ${darkMode ? 'text-rose-300' : 'text-rose-600'}`}>Períodos anteriores</div>
+          <div className={`text-xs ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>+ Agregar</div>
+        </button>
+        <button onClick={() => setModal('deudas')} className={`p-4 rounded-2xl text-left ${darkMode ? 'bg-rose-900' : 'bg-rose-50'}`}>
+          <div className={`text-sm ${darkMode ? 'text-rose-200' : 'text-rose-700'}`}>Deuda Vencida</div>
+          <div className={`text-2xl font-bold ${darkMode ? 'text-rose-300' : 'text-rose-600'}`}>{formatCurrency(totalDeuda)}</div>
         </button>
         <div className={`p-4 rounded-2xl ${darkMode ? 'bg-amber-900' : 'bg-amber-50'}`}>
-          <div className={`text-sm font-medium ${darkMode ? 'text-amber-200' : 'text-amber-700'}`}>Consumos Período</div>
-          <div className={`text-2xl font-bold ${darkMode ? 'text-amber-300' : 'text-amber-600'}`}>{formatCurrency(totalConsumosPeriodo)}</div>
-          <div className={`text-xs ${darkMode ? 'text-amber-300' : 'text-amber-700'}`}>Período actual</div>
+          <div className={`text-sm ${darkMode ? 'text-amber-200' : 'text-amber-700'}`}>Consumos Período</div>
+          <div className={`text-2xl font-bold ${darkMode ? 'text-amber-300' : 'text-amber-600'}`}>{formatCurrency(totalConsumos)}</div>
         </div>
         <div className={`p-4 rounded-2xl ${darkMode ? 'bg-blue-900' : 'bg-blue-50'}`}>
-          <div className={`text-sm font-medium ${darkMode ? 'text-blue-200' : 'text-blue-700'}`}>Saldo Disponible</div>
-          <div className={`text-2xl font-bold ${calcularSaldoDisponible() >= 0 ? (darkMode ? 'text-blue-300' : 'text-blue-600') : 'text-rose-500'}`}>{formatCurrency(calcularSaldoDisponible())}</div>
+          <div className={`text-sm ${darkMode ? 'text-blue-200' : 'text-blue-700'}`}>Disponible</div>
+          <div className={`text-2xl font-bold ${disponible >= 0 ? (darkMode ? 'text-blue-300' : 'text-blue-600') : 'text-rose-500'}`}>{formatCurrency(disponible)}</div>
         </div>
       </div>
 
-      {/* BOTONES DE CONSUMO Y PAGO */}
       <div className="grid grid-cols-2 gap-4">
-        <button onClick={() => setModal('consumo')} className="flex items-center justify-center gap-2 p-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl font-medium shadow-lg"><Minus className="w-5 h-5" /> Consumo</button>
-        <button onClick={() => setModal('pago')} className="flex items-center justify-center gap-2 p-4 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl font-medium shadow-lg"><Plus className="w-5 h-5" /> Pago</button>
+        <button onClick={() => setModal('consumo')} className="flex items-center justify-center gap-2 p-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl font-medium">
+          <Minus className="w-5 h-5" /> Consumo
+        </button>
+        <button onClick={() => setModal('pago')} className="flex items-center justify-center gap-2 p-4 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl font-medium">
+          <Plus className="w-5 h-5" /> Pago
+        </button>
       </div>
 
-      {/* CUOTAS ACTIVAS - Mejorado */}
       {cuotas.filter(c => c.estado === 'activa').length > 0 && (
-        <div className={`border rounded-xl p-4 ${theme.card}`}>
+        <div className={`border rounded-xl p-4 ${theme.card} ${theme.border}`}>
           <h3 className={`font-semibold mb-3 flex items-center gap-2 ${theme.text}`}><Repeat className="w-5 h-5 text-purple-500" /> Cuotas Activas</h3>
-          <div className="space-y-2">
-            {cuotas.filter(c => c.estado === 'activa').map(c => {
-              const cuotaActual = c.cuotasTotales - c.cuotasPendientes;
-              const proximaCuota = cuotaActual + 1;
-              return (
-                <div key={c.id} className={`flex justify-between items-center p-3 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-slate-50'}`}>
-                  <div className="flex-1">
-                    <p className={`font-medium text-sm ${theme.text}`}>{c.descripcion}</p>
-                    <p className={`text-xs ${theme.textMuted}`}>
-                      Próxima: cuota {proximaCuota} de {c.cuotasTotales} • Restan {c.cuotasPendientes}
-                    </p>
-                  </div>
-                  <p className="font-semibold text-purple-500 mr-2">{formatCurrency(c.montoCuota)}</p>
-                  <button onClick={() => { setCuotaEditar(c); setModal('editar-cuota'); }} className="p-1 text-blue-500"><Edit3 className="w-4 h-4" /></button>
-                  <button onClick={() => { if(window.confirm('¿Eliminar?')) eliminarCuota(c.id); }} className="p-1 text-red-500"><Trash2 className="w-4 h-4" /></button>
-                </div>
-              );
-            })}
-          </div>
+          {cuotas.filter(c => c.estado === 'activa').map(c => (
+            <div key={c.id} className={`flex justify-between items-center p-3 rounded-lg mb-2 ${darkMode ? 'bg-gray-700' : 'bg-slate-50'}`}>
+              <div>
+                <p className={`font-medium text-sm ${theme.text}`}>{c.descripcion}</p>
+                <p className={`text-xs ${theme.textMuted}`}>Próxima: {c.cuotasTotales - c.cuotasPendientes + 1}/{c.cuotasTotales} • Restan {c.cuotasPendientes}</p>
+              </div>
+              <p className="font-semibold text-purple-500">{formatCurrency(c.montoCuota)}</p>
+              <button onClick={() => { setCuotaEditar(c); setModal('editarCuota'); }} className="p-1 text-blue-500"><Edit3 className="w-4 h-4" /></button>
+              <button onClick={() => { if(window.confirm('¿Eliminar?')) eliminarCuota(c.id); }} className="p-1 text-red-500"><Trash2 className="w-4 h-4" /></button>
+            </div>
+          ))}
         </div>
       )}
 
-      {/* CUENTAS */}
       <div>
         <div className="flex justify-between items-center mb-4">
           <h2 className={`text-lg font-bold ${theme.text}`}>Cuentas</h2>
-          <button onClick={() => { setCuentaEditar(null); setModal('cuenta'); }} className="p-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700">
-            <PlusCircle className="w-5 h-5" />
-          </button>
+          <button onClick={() => { setCuentaEditar(null); setModal('cuenta'); }} className="p-2 bg-indigo-600 text-white rounded-xl"><PlusCircle className="w-5 h-5" /></button>
         </div>
-        <div className="space-y-3">
-          {cuentasContables.map(c => {
-            const deudaC = calcularDeudaReal(c.id);
-            const consumosC = calcularConsumosPeriodo(c.id);
-            const pagosC = calcularPagosPeriodo(c.id);
-            const saldoPeriodoC = consumosC - pagosC;
-            return (
-              <div key={c.id} onClick={() => { setCuentaActiva(c); setTab('detalle'); }} className={`p-4 rounded-2xl border cursor-pointer transition-all ${theme.border} ${theme.card} hover:shadow-lg`}>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-3">
-                    <EntidadLogo entidad={c.entidad} size={40} />
-                    <div>
-                      <div className={`font-semibold ${theme.text}`}>{c.nombre}</div>
-                      <div className={`text-xs ${theme.textMuted}`}>{TIPOS_CUENTA.find(t => t.id === c.tipoCuenta)?.nombre}</div>
-                    </div>
-                  </div>
-                  <button onClick={(e) => { e.stopPropagation(); setCuentaEditar(c); setModal('cuenta'); }} className={`p-2 rounded-lg ${theme.hover}`}>
-                    <Edit3 className="w-4 h-4" />
-                  </button>
-                </div>
-                <div className={`grid grid-cols-3 gap-2 text-xs p-2 rounded-lg mb-2 ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
-                  <div className="text-center">
-                    <div className={theme.textMuted}>Deuda</div>
-                    <div className={`font-bold ${deudaC > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(deudaC)}</div>
-                  </div>
-                  <div className="text-center">
-                    <div className={theme.textMuted}>Período</div>
-                    <div className={`font-bold ${saldoPeriodoC > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>{formatCurrency(saldoPeriodoC)}</div>
-                  </div>
-                  <div className="text-center">
-                    <div className={theme.textMuted}>Total</div>
-                    <div className={`font-bold ${(deudaC + saldoPeriodoC) > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(deudaC + saldoPeriodoC)}</div>
+        {cuentasContables.map(c => {
+          const deuda = getDeudaReal(c.id);
+          const periodo = getSaldoPeriodo(c.id);
+          const total = deuda + periodo;
+          return (
+            <div key={c.id} onClick={() => { setCuentaActiva(c); setTab('detalle'); }} className={`p-4 rounded-2xl border mb-3 cursor-pointer ${theme.border} ${theme.card}`}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-3">
+                  <EntidadLogo entidad={c.entidad} size={40} />
+                  <div>
+                    <div className={`font-semibold ${theme.text}`}>{c.nombre}</div>
+                    <div className={`text-xs ${theme.textMuted}`}>{TIPOS_CUENTA.find(t => t.id === c.tipoCuenta)?.nombre}</div>
                   </div>
                 </div>
-                <div className={`flex justify-between text-xs ${theme.textMuted}`}>
-                  {c.fechaCierre && <span>Cierre: {formatDateShort(c.fechaCierre)}</span>}
-                  {c.fechaVencimiento && <span>Vence: {formatDateShort(c.fechaVencimiento)}</span>}
+                <button onClick={(e) => { e.stopPropagation(); setCuentaEditar(c); setModal('editarCuenta'); }} className="p-2"><Edit3 className="w-4 h-4" /></button>
+              </div>
+              <div className={`grid grid-cols-3 gap-2 text-xs p-2 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
+                <div className="text-center">
+                  <div className={theme.textMuted}>Deuda</div>
+                  <div className={`font-bold ${deuda > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(deuda)}</div>
+                </div>
+                <div className="text-center">
+                  <div className={theme.textMuted}>Período</div>
+                  <div className={`font-bold ${periodo > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>{formatCurrency(periodo)}</div>
+                </div>
+                <div className="text-center">
+                  <div className={theme.textMuted}>Total</div>
+                  <div className={`font-bold ${total > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(total)}</div>
                 </div>
               </div>
-            );
-          })}
-        </div>
+              <div className={`flex justify-between text-xs mt-2 ${theme.textMuted}`}>
+                <span>Cierre: {formatDate(c.cierreActual)}</span>
+                <span>Vence: {formatDate(c.vencimientoActual)}</span>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
 
+  // DETALLE CUENTA
   const DetalleCuenta = () => {
     if (!cuentaActiva) return null;
-    const p = periodos.find(p => p.cuentaId === cuentaActiva.id && p.estado === 'abierto');
-    const deudaCuenta = calcularDeudaReal(cuentaActiva.id);
-    const consumosCuenta = calcularConsumosPeriodo(cuentaActiva.id);
-    const pagosCuenta = calcularPagosPeriodo(cuentaActiva.id);
-    const saldoPeriodoCuenta = consumosCuenta - pagosCuenta;
-    const saldoTotal = deudaCuenta + saldoPeriodoCuenta;
-    const cuotasC = cuotas.filter(c => c.cuentaId === cuentaActiva.id && c.estado === 'activa');
+    const c = cuentas.find(x => x.id === cuentaActiva.id) || cuentaActiva;
+    const deuda = getDeudaReal(c.id);
+    const saldoP = getSaldoPeriodo(c.id);
+    const total = deuda + saldoP;
+    const p = getPeriodo(c);
     
-    const todos = [
-      ...movimientos.filter(m => m.cuentaId === cuentaActiva.id).map(m => ({ ...m, tipo: 'consumo' })),
-      ...pagos.filter(pago => pago.cuentaId === cuentaActiva.id).map(pago => ({ ...pago, tipo: 'pago' }))
-    ].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+    const movs = movimientos.filter(m => m.cuentaId === c.id && m.fecha >= p.inicio && m.fecha <= p.fin && !m.periodoCerrado);
+    const pags = pagos.filter(pg => pg.cuentaId === c.id && pg.fecha >= p.inicio && pg.fecha <= p.fin);
+    const todos = [...movs.map(m => ({...m, tipo: 'consumo'})), ...pags.map(pg => ({...pg, tipo: 'pago'}))].sort((a,b) => new Date(b.fecha) - new Date(a.fecha));
 
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-3">
-          <button onClick={() => { setCuentaActiva(null); setTab('dashboard'); }} className={`p-2 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}><ChevronRight className={`w-5 h-5 rotate-180 ${theme.text}`} /></button>
-          <EntidadLogo entidad={cuentaActiva.entidad} size={44} />
-          <div className="flex-1"><h2 className={`text-lg font-bold ${theme.text}`}>{cuentaActiva.nombre}</h2><p className={`text-sm ${theme.textMuted}`}>{TIPOS_CUENTA.find(t => t.id === cuentaActiva.tipoCuenta)?.nombre}</p></div>
-          <button onClick={() => { if(window.confirm('¿Eliminar esta cuenta y todos sus movimientos?')) { eliminarCuenta(cuentaActiva.id); setCuentaActiva(null); setTab('dashboard'); } }} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-5 h-5" /></button>
+          <button onClick={() => { setCuentaActiva(null); setTab('dashboard'); }} className={`p-2 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
+            <ChevronRight className={`w-5 h-5 rotate-180 ${theme.text}`} />
+          </button>
+          <EntidadLogo entidad={c.entidad} size={44} />
+          <div className="flex-1">
+            <h2 className={`text-lg font-bold ${theme.text}`}>{c.nombre}</h2>
+          </div>
+          <button onClick={() => { setCuentaEditar(c); setModal('editarCuenta'); }} className="p-2 text-blue-500"><Edit3 className="w-5 h-5" /></button>
+          <button onClick={() => { if(window.confirm('¿Eliminar?')) { eliminarCuenta(c.id); setCuentaActiva(null); setTab('dashboard'); }}} className="p-2 text-red-500"><Trash2 className="w-5 h-5" /></button>
         </div>
 
-        {/* Resumen de saldos */}
         <div className={`rounded-xl p-4 ${darkMode ? 'bg-gray-800' : 'bg-slate-100'}`}>
           <div className="grid grid-cols-3 gap-3 text-center mb-3">
-            <div>
-              <div className={`text-xs ${theme.textMuted}`}>Deuda Anterior</div>
-              <div className={`text-lg font-bold ${deudaCuenta > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(deudaCuenta)}</div>
-            </div>
-            <div>
-              <div className={`text-xs ${theme.textMuted}`}>Saldo Período</div>
-              <div className={`text-lg font-bold ${saldoPeriodoCuenta > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>{formatCurrency(saldoPeriodoCuenta)}</div>
-            </div>
-            <div>
-              <div className={`text-xs ${theme.textMuted}`}>Total</div>
-              <div className={`text-lg font-bold ${saldoTotal > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(saldoTotal)}</div>
-            </div>
+            <div><div className={`text-xs ${theme.textMuted}`}>Deuda</div><div className={`text-lg font-bold ${deuda > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(deuda)}</div></div>
+            <div><div className={`text-xs ${theme.textMuted}`}>Período</div><div className={`text-lg font-bold ${saldoP > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>{formatCurrency(saldoP)}</div></div>
+            <div><div className={`text-xs ${theme.textMuted}`}>Total</div><div className={`text-lg font-bold ${total > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(total)}</div></div>
           </div>
-          {p && (
-            <div className="pt-3 border-t border-gray-600">
-              <div className="flex justify-between items-center mb-2">
-                <span className={`text-sm ${theme.textMuted}`}>Período: {formatDateShort(p.fechaInicio)} - {formatDateShort(p.fechaCierre)}</span>
-              </div>
-              <button onClick={() => {
-                setModalCerrarPeriodo({ cuentaId: cuentaActiva.id, periodo: p });
-              }} className="w-full py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium">Cerrar Período</button>
-            </div>
-          )}
+          <button onClick={() => setModalCierre({ cuenta: c })} className="w-full py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium">Cerrar Período</button>
         </div>
 
-        {cuotasC.length > 0 && (
-          <div className={`border rounded-xl p-3 ${theme.card}`}>
-            <h4 className={`font-semibold mb-2 text-sm ${theme.text}`}>Cuotas en curso</h4>
-            {cuotasC.map(c => {
-              const proximaCuota = c.cuotasTotales - c.cuotasPendientes + 1;
-              return (
-                <div key={c.id} className={`flex items-center justify-between p-2 rounded-lg mb-1 ${darkMode ? 'bg-gray-700' : 'bg-slate-50'}`}>
-                  <div>
-                    <p className={`text-sm ${theme.text}`}>{c.descripcion}</p>
-                    <p className={`text-xs ${theme.textMuted}`}>Próxima: {proximaCuota}/{c.cuotasTotales} - {formatCurrency(c.montoCuota)}/cuota</p>
-                  </div>
-                  <div className="flex gap-1">
-                    <button onClick={() => { setCuotaEditar(c); setModal('editar-cuota'); }} className="p-1 text-blue-500"><Edit3 className="w-4 h-4" /></button>
-                    <button onClick={() => { if(window.confirm('¿Eliminar?')) eliminarCuota(c.id); }} className="p-1 text-red-500"><Trash2 className="w-4 h-4" /></button>
-                  </div>
-                </div>
-              );
-            })}
+        <div className={`rounded-xl p-4 ${darkMode ? 'bg-gray-800' : 'bg-slate-100'}`}>
+          <h4 className={`font-semibold mb-3 ${theme.text}`}>Fechas</h4>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div><div className={theme.textMuted}>Cierre Anterior</div><div className={theme.text}>{formatDate(c.cierreAnterior)}</div></div>
+            <div><div className={theme.textMuted}>Venc. Anterior</div><div className={theme.text}>{formatDate(c.vencimientoAnterior)}</div></div>
+            <div><div className={theme.textMuted}>Cierre Actual</div><div className={`font-bold ${theme.text}`}>{formatDate(c.cierreActual)}</div></div>
+            <div><div className={theme.textMuted}>Venc. Actual</div><div className={`font-bold ${theme.text}`}>{formatDate(c.vencimientoActual)}</div></div>
+            <div><div className={theme.textMuted}>Cierre Próximo</div><div className={theme.text}>{formatDate(c.cierreProximo)}</div></div>
+            <div><div className={theme.textMuted}>Venc. Próximo</div><div className={theme.text}>{formatDate(c.vencimientoProximo)}</div></div>
           </div>
-        )}
+        </div>
+
         <div>
           <h4 className={`font-semibold mb-2 ${theme.text}`}>Movimientos</h4>
           {todos.length === 0 ? <p className={`text-center py-4 ${theme.textMuted}`}>Sin movimientos</p> : (
             <div className={`border rounded-xl divide-y ${theme.card} ${theme.border}`}>
-              {todos.map((m, i) => (
-                <div key={m.id + i} className="p-3 flex items-center gap-3">
-                  <span className="text-lg">{m.tipo === 'pago' ? (m.esParaDeuda ? '🏦' : '💰') : m.esCuota ? '🔄' : CATEGORIAS.find(c => c.id === m.categoria)?.icon || '📦'}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className={`font-medium text-sm truncate ${theme.text}`}>{m.descripcion}</p>
-                    <p className={`text-xs ${theme.textMuted}`}>{formatDateShort(m.fecha)} {m.tipo === 'pago' && m.esParaDeuda && '• Pago deuda'}</p>
-                  </div>
+              {todos.map((m,i) => (
+                <div key={m.id+i} className="p-3 flex items-center gap-3">
+                  <span className="text-lg">{m.tipo === 'pago' ? '💰' : m.esCuota ? '🔄' : CATEGORIAS.find(x => x.id === m.categoria)?.icon || '📦'}</span>
+                  <div className="flex-1"><p className={`font-medium text-sm ${theme.text}`}>{m.descripcion}</p><p className={`text-xs ${theme.textMuted}`}>{formatDate(m.fecha)}</p></div>
                   <p className={`font-semibold ${m.tipo === 'pago' ? 'text-emerald-500' : 'text-rose-500'}`}>{m.tipo === 'pago' ? '+' : '-'}{formatCurrency(m.monto)}</p>
-                  {m.tipo === 'consumo' && !m.esSaldoAnterior && (
-                    <div className="flex gap-1"><button onClick={() => { setMovimientoEditar(m); setModal('editar-mov'); }} className="p-1 text-blue-500"><Edit3 className="w-3 h-3" /></button><button onClick={() => { if(window.confirm('¿Eliminar?')) eliminarMovimiento(m.id); }} className="p-1 text-red-500"><Trash2 className="w-3 h-3" /></button></div>
-                  )}
-                  {m.tipo === 'pago' && (
-                    <div className="flex gap-1"><button onClick={() => { setPagoEditar(m); setModal('editar-pago'); }} className="p-1 text-blue-500"><Edit3 className="w-3 h-3" /></button><button onClick={() => { if(window.confirm('¿Eliminar este pago?')) eliminarPago(m.id); }} className="p-1 text-red-500"><Trash2 className="w-3 h-3" /></button></div>
-                  )}
+                  {m.tipo === 'consumo' && <button onClick={() => { setMovEditar(m); setModal('editarMov'); }} className="p-1 text-blue-500"><Edit3 className="w-3 h-3" /></button>}
+                  {m.tipo === 'consumo' && <button onClick={() => { if(window.confirm('¿Eliminar?')) eliminarMovimiento(m.id); }} className="p-1 text-red-500"><Trash2 className="w-3 h-3" /></button>}
+                  {m.tipo === 'pago' && <button onClick={() => { setPagoEditar(m); setModal('editarPago'); }} className="p-1 text-blue-500"><Edit3 className="w-3 h-3" /></button>}
+                  {m.tipo === 'pago' && <button onClick={() => { if(window.confirm('¿Eliminar?')) eliminarPago(m.id); }} className="p-1 text-red-500"><Trash2 className="w-3 h-3" /></button>}
                 </div>
               ))}
             </div>
@@ -753,27 +491,136 @@ const MonityApp = () => {
     );
   };
 
-  const ModalCuenta = () => {
-    const [nombre, setNombre] = useState(cuentaEditar?.nombre || '');
-    const [tipoCuenta, setTipoCuenta] = useState(cuentaEditar?.tipoCuenta || 'tarjeta_credito');
-    const [entidad, setEntidad] = useState(cuentaEditar?.entidad || '');
-    const [fechaCierre, setFechaCierre] = useState(cuentaEditar?.fechaCierre || '');
-    const [fechaVencimiento, setFechaVencimiento] = useState(cuentaEditar?.fechaVencimiento || '');
-    const [fechaCierreAnterior, setFechaCierreAnterior] = useState(cuentaEditar?.fechaCierreAnterior || '');
-    
+  // MODALES
+  const ModalIngreso = () => {
+    const [nombre, setNombre] = useState('');
+    const [monto, setMonto] = useState('');
+    const [editando, setEditando] = useState(null);
+
+    const guardar = async () => {
+      if (editando) await actualizarCuenta(editando.id, { nombre, montoMensual: parseFloat(monto) });
+      else await guardarCuenta({ nombre, montoMensual: parseFloat(monto), tipo: 'ingreso' });
+      setNombre(''); setMonto(''); setEditando(null);
+    };
+
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
         <div className={`rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto ${theme.card}`}>
-          <div className={`p-4 border-b flex justify-between ${theme.border}`}><h3 className={`font-bold ${theme.text}`}>{cuentaEditar ? 'Editar Cuenta' : 'Nueva Cuenta'}</h3><button onClick={() => { setModal(null); setCuentaEditar(null); }}><X className={`w-5 h-5 ${theme.text}`} /></button></div>
+          <div className={`p-4 border-b flex justify-between ${theme.border}`}><h3 className={`font-bold ${theme.text}`}>Ingresos</h3><button onClick={() => setModal(null)}><X className={`w-5 h-5 ${theme.text}`} /></button></div>
           <div className="p-4 space-y-4">
-            <div><label className={`block text-sm mb-1 ${theme.textMuted}`}>Tipo</label><select value={tipoCuenta} onChange={e => setTipoCuenta(e.target.value)} className={`w-full p-3 border rounded-xl ${theme.input}`}>{TIPOS_CUENTA.map(t => <option key={t.id} value={t.id}>{t.icon} {t.nombre}</option>)}</select></div>
-            <div><label className={`block text-sm mb-1 ${theme.textMuted}`}>Entidad</label><select value={entidad} onChange={e => setEntidad(e.target.value)} className={`w-full p-3 border rounded-xl ${theme.input}`}><option value="">Seleccionar...</option><optgroup label="Bancos">{BANCOS_ARGENTINA.map(b => <option key={b.id} value={b.nombre}>{b.nombre}</option>)}</optgroup><optgroup label="Billeteras">{BILLETERAS_VIRTUALES.map(b => <option key={b.id} value={b.nombre}>{b.nombre}</option>)}</optgroup></select></div>
-            <input type="text" value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Nombre personalizado" className={`w-full p-3 border rounded-xl ${theme.input}`} />
-            {!cuentaEditar && <DatePicker label="Cierre anterior" value={fechaCierreAnterior} onChange={setFechaCierreAnterior} darkMode={darkMode} theme={theme} />}
-            <DatePicker label="Cierre actual" value={fechaCierre} onChange={setFechaCierre} darkMode={darkMode} theme={theme} />
-            <DatePicker label="Vencimiento" value={fechaVencimiento} onChange={setFechaVencimiento} darkMode={darkMode} theme={theme} />
+            {cuentasIngreso.length > 0 && (
+              <div className={`rounded-xl border ${theme.border}`}>
+                {cuentasIngreso.map(ing => (
+                  <div key={ing.id} className={`p-3 flex justify-between items-center border-b last:border-b-0 ${theme.border}`}>
+                    <div><div className={theme.text}>{ing.nombre}</div><div className="text-emerald-500 font-bold">{formatCurrency(ing.montoMensual)}</div></div>
+                    <div className="flex gap-2">
+                      <button onClick={() => { setEditando(ing); setNombre(ing.nombre); setMonto(ing.montoMensual?.toString()); }} className="p-2 text-blue-500"><Edit3 className="w-4 h-4" /></button>
+                      <button onClick={() => { if(window.confirm('¿Eliminar?')) eliminarCuenta(ing.id); }} className="p-2 text-red-500"><Trash2 className="w-4 h-4" /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className={`p-3 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
+              <h4 className={`font-semibold mb-3 ${theme.text}`}>{editando ? 'Editar' : 'Nuevo'}</h4>
+              <input type="text" value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Nombre" className={`w-full p-3 border rounded-xl mb-3 ${theme.input}`} />
+              <input type="number" value={monto} onChange={e => setMonto(e.target.value)} placeholder="Monto" className={`w-full p-3 border rounded-xl mb-3 ${theme.input}`} />
+              <button onClick={guardar} disabled={!nombre || !monto} className="w-full p-3 bg-emerald-600 text-white rounded-xl disabled:opacity-50">{editando ? 'Actualizar' : 'Agregar'}</button>
+              {editando && <button onClick={() => { setEditando(null); setNombre(''); setMonto(''); }} className={`w-full p-3 mt-2 border rounded-xl ${theme.border} ${theme.text}`}>Cancelar</button>}
+            </div>
           </div>
-          <div className={`p-4 border-t flex gap-3 ${theme.border}`}><button onClick={() => { setModal(null); setCuentaEditar(null); }} className={`flex-1 p-3 border rounded-xl ${theme.border} ${theme.text}`}>Cancelar</button><button onClick={async () => { await guardarCuenta({ tipo: cuentaEditar ? cuentaEditar.tipo : 'contable', nombre: nombre || entidad, tipoCuenta, entidad, fechaCierre, fechaVencimiento, fechaCierreAnterior: fechaCierreAnterior || fechaCierre }); setModal(null); }} disabled={!fechaCierre || !entidad} className="flex-1 p-3 bg-indigo-600 text-white rounded-xl disabled:opacity-50">{cuentaEditar ? 'Guardar' : 'Crear'}</button></div>
+          <div className={`p-4 border-t ${theme.border}`}>
+            <div className="flex justify-between"><span className={theme.text}>Total:</span><span className="text-2xl font-bold text-emerald-500">{formatCurrency(totalIngresos)}</span></div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const ModalCuenta = () => {
+    const [nombre, setNombre] = useState('');
+    const [tipoCuenta, setTipoCuenta] = useState('tarjeta_credito');
+    const [entidad, setEntidad] = useState('');
+    const [cierreAnt, setCierreAnt] = useState('');
+    const [cierreAct, setCierreAct] = useState('');
+    const [cierreProx, setCierreProx] = useState('');
+    const [vencAnt, setVencAnt] = useState('');
+    const [vencAct, setVencAct] = useState('');
+    const [vencProx, setVencProx] = useState('');
+
+    const guardar = async () => {
+      await guardarCuenta({
+        nombre, tipoCuenta, entidad, tipo: 'contable', deudaAcumulada: 0,
+        cierreAnterior: cierreAnt, cierreActual: cierreAct, cierreProximo: cierreProx,
+        vencimientoAnterior: vencAnt, vencimientoActual: vencAct, vencimientoProximo: vencProx
+      });
+      setModal(null);
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className={`rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto ${theme.card}`}>
+          <div className={`p-4 border-b flex justify-between ${theme.border}`}><h3 className={`font-bold ${theme.text}`}>Nueva Cuenta</h3><button onClick={() => setModal(null)}><X className={`w-5 h-5 ${theme.text}`} /></button></div>
+          <div className="p-4 space-y-4">
+            <input type="text" value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Nombre" className={`w-full p-3 border rounded-xl ${theme.input}`} />
+            <select value={tipoCuenta} onChange={e => setTipoCuenta(e.target.value)} className={`w-full p-3 border rounded-xl ${theme.input}`}>
+              {TIPOS_CUENTA.map(t => <option key={t.id} value={t.id}>{t.icon} {t.nombre}</option>)}
+            </select>
+            <select value={entidad} onChange={e => setEntidad(e.target.value)} className={`w-full p-3 border rounded-xl ${theme.input}`}>
+              <option value="">Entidad...</option>
+              {BANCOS.map(b => <option key={b.id} value={b.nombre}>{b.nombre}</option>)}
+            </select>
+            <div className={`p-3 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
+              <h4 className={`font-semibold mb-3 ${theme.text}`}>Fechas Cierre</h4>
+              <div className="grid grid-cols-3 gap-2">
+                <DateInput label="Anterior" value={cierreAnt} onChange={setCierreAnt} theme={theme} />
+                <DateInput label="Actual" value={cierreAct} onChange={setCierreAct} theme={theme} />
+                <DateInput label="Próximo" value={cierreProx} onChange={setCierreProx} theme={theme} />
+              </div>
+            </div>
+            <div className={`p-3 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
+              <h4 className={`font-semibold mb-3 ${theme.text}`}>Fechas Vencimiento</h4>
+              <div className="grid grid-cols-3 gap-2">
+                <DateInput label="Anterior" value={vencAnt} onChange={setVencAnt} theme={theme} />
+                <DateInput label="Actual" value={vencAct} onChange={setVencAct} theme={theme} />
+                <DateInput label="Próximo" value={vencProx} onChange={setVencProx} theme={theme} />
+              </div>
+            </div>
+          </div>
+          <div className={`p-4 border-t flex gap-3 ${theme.border}`}>
+            <button onClick={() => setModal(null)} className={`flex-1 p-3 border rounded-xl ${theme.border} ${theme.text}`}>Cancelar</button>
+            <button onClick={guardar} disabled={!nombre || !entidad} className="flex-1 p-3 bg-indigo-600 text-white rounded-xl disabled:opacity-50">Guardar</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const ModalEditarCuenta = () => {
+    const [nombre, setNombre] = useState(cuentaEditar?.nombre || '');
+    const [cierreProx, setCierreProx] = useState(cuentaEditar?.cierreProximo || '');
+    const [vencProx, setVencProx] = useState(cuentaEditar?.vencimientoProximo || '');
+    if (!cuentaEditar) return null;
+
+    const guardar = async () => {
+      await actualizarCuenta(cuentaEditar.id, { nombre, cierreProximo: cierreProx, vencimientoProximo: vencProx });
+      if (cuentaActiva?.id === cuentaEditar.id) setCuentaActiva({ ...cuentaActiva, nombre, cierreProximo: cierreProx, vencimientoProximo: vencProx });
+      setModal(null); setCuentaEditar(null);
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className={`rounded-2xl w-full max-w-lg ${theme.card}`}>
+          <div className={`p-4 border-b flex justify-between ${theme.border}`}><h3 className={`font-bold ${theme.text}`}>Editar Cuenta</h3><button onClick={() => { setModal(null); setCuentaEditar(null); }}><X className={`w-5 h-5 ${theme.text}`} /></button></div>
+          <div className="p-4 space-y-4">
+            <div><label className={`text-sm ${theme.textMuted}`}>Nombre</label><input type="text" value={nombre} onChange={e => setNombre(e.target.value)} className={`w-full p-3 border rounded-xl ${theme.input}`} /></div>
+            <DateInput label="Próximo Cierre" value={cierreProx} onChange={setCierreProx} theme={theme} />
+            <DateInput label="Próximo Vencimiento" value={vencProx} onChange={setVencProx} theme={theme} />
+          </div>
+          <div className={`p-4 border-t flex gap-3 ${theme.border}`}>
+            <button onClick={() => { setModal(null); setCuentaEditar(null); }} className={`flex-1 p-3 border rounded-xl ${theme.border} ${theme.text}`}>Cancelar</button>
+            <button onClick={guardar} className="flex-1 p-3 bg-indigo-600 text-white rounded-xl">Guardar</button>
+          </div>
         </div>
       </div>
     );
@@ -781,213 +628,54 @@ const MonityApp = () => {
 
   const ModalConsumo = () => {
     const [cuentaId, setCuentaId] = useState('');
-    const [descripcion, setDescripcion] = useState('');
+    const [desc, setDesc] = useState('');
     const [monto, setMonto] = useState('');
-    const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
-    const [categoria, setCategoria] = useState('otros');
-    const [tipoQuotas, setTipoQuotas] = useState('sin'); // 'sin', 'totalYCantidad', 'montoPorCuota'
-    const [montoTotal, setMontoTotal] = useState('');
-    const [cantidadQuotas, setCantidadQuotas] = useState('');
-    const [montoPorCuota, setMontoPorCuota] = useState('');
-    const [numeroCuotaActual, setNumeroCuotaActual] = useState('1');
-    const [esDebito, setEsDebito] = useState(false);
-
-    // Cálculos para OPCIÓN 1: Total y Cantidad
-    const montoPorCuotaCalculado1 = tipoQuotas === 'totalYCantidad' && montoTotal && cantidadQuotas 
-      ? (parseFloat(montoTotal) / parseInt(cantidadQuotas)).toFixed(2)
-      : 0;
-
-    // Cálculos para OPCIÓN 2: Monto por Cuota
-    const cuotasRestantes = tipoQuotas === 'montoPorCuota' && montoPorCuota && cantidadQuotas
-      ? parseInt(cantidadQuotas) - (parseInt(numeroCuotaActual) - 1)
-      : 0;
+    const [cat, setCat] = useState('otros');
+    const [fecha, setFecha] = useState(new Date().toISOString().slice(0,10));
+    const [esCuota, setEsCuota] = useState(false);
+    const [cuotaActual, setCuotaActual] = useState('1');
+    const [cuotasTotales, setCuotasTotales] = useState('');
 
     const guardar = async () => {
-      if (tipoQuotas === 'sin') {
-        // Sin cuotas - consumo simple
-        const datos = {
-          cuentaId,
-          descripcion,
-          monto: parseFloat(monto),
-          categoria,
-          fecha,
-          tipo: 'consumo'
-        };
-        if (esDebito) {
-          datos.esDebito = true;
-          await guardarDebito(datos);
-        } else {
-          await guardarMovimiento(datos);
-        }
-      } else if (tipoQuotas === 'totalYCantidad') {
-        // OPCIÓN 1: Total monto y cantidad de cuotas (empieza desde cuota 1)
-        const totalCuotas = parseInt(cantidadQuotas);
-        const montoPorCuotaCalc = parseFloat(montoTotal) / totalCuotas;
-        
-        const cuotaId = await guardarCuota({
-          cuentaId,
-          descripcion,
-          montoTotal: parseFloat(montoTotal),
-          montoCuota: montoPorCuotaCalc,
-          cuotasTotales: totalCuotas,
-          cuotasPendientes: totalCuotas - 1, // Quedan todas menos la primera
-          categoria,
-          fechaInicio: fecha,
-          cuotaActual: 1,
-          estado: 'activa'
-        });
-
-        // Solo crear el movimiento de la PRIMERA cuota
-        // Las siguientes se generan al cerrar período
-        await guardarMovimiento({
-          cuentaId,
-          descripcion: `${descripcion} (1/${totalCuotas})`,
-          monto: montoPorCuotaCalc,
-          categoria: 'cuota',
-          fecha,
-          esCuota: true,
-          cuotaId,
-          esDebito: false
-        });
-      } else if (tipoQuotas === 'montoPorCuota') {
-        // OPCIÓN 2: Monto por cuota y cantidad
-        // Si el usuario dice que está en cuota X de Y, las cuotas 1 a X-1 ya están pagas
-        // Solo creamos la cuota actual como movimiento, las futuras se generan al cerrar período
-        
-        const cuotaActualNum = parseInt(numeroCuotaActual);
-        const totalCuotas = parseInt(cantidadQuotas);
-        const cuotasPendientesRestantes = totalCuotas - cuotaActualNum; // Cuotas DESPUÉS de la actual
-        
-        const cuotaId = await guardarCuota({
-          cuentaId,
-          descripcion,
-          montoTotal: parseFloat(montoPorCuota) * totalCuotas,
-          montoCuota: parseFloat(montoPorCuota),
-          cuotasTotales: totalCuotas,
-          cuotasPendientes: cuotasPendientesRestantes, // Solo las que faltan DESPUÉS de la actual
-          cuotaActual: cuotaActualNum,
-          categoria,
-          fechaInicio: fecha,
-          estado: cuotasPendientesRestantes <= 0 ? 'finalizada' : 'activa'
-        });
-
-        // Solo crear UN movimiento para la cuota ACTUAL
-        // Las cuotas futuras se generarán automáticamente al cerrar cada período
-        await guardarMovimiento({
-          cuentaId,
-          descripcion: `${descripcion} (${cuotaActualNum}/${totalCuotas})`,
-          monto: parseFloat(montoPorCuota),
-          categoria: 'cuota',
-          fecha,
-          esCuota: true,
-          cuotaId,
-          esDebito: false
-        });
+      if (esCuota && cuotasTotales) {
+        const total = parseInt(cuotasTotales);
+        const actual = parseInt(cuotaActual) || 1;
+        const pend = total - actual;
+        const cuotaId = await guardarCuota({ cuentaId, descripcion: desc, montoCuota: parseFloat(monto), cuotasTotales: total, cuotasPendientes: pend, estado: pend <= 0 ? 'finalizada' : 'activa' });
+        await guardarMovimiento({ cuentaId, descripcion: `${desc} (${actual}/${total})`, monto: parseFloat(monto), categoria: 'cuota', fecha, esCuota: true, cuotaId });
+      } else {
+        await guardarMovimiento({ cuentaId, descripcion: desc, monto: parseFloat(monto), categoria: cat, fecha });
       }
       setModal(null);
     };
 
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-        <div className={`rounded-2xl w-full max-w-lg my-4 ${theme.card}`}>
-          <div className={`p-4 border-b flex justify-between ${theme.border}`}>
-            <h3 className={`font-bold ${theme.text}`}>Cargar Consumo</h3>
-            <button onClick={() => setModal(null)}><X className={`w-5 h-5 ${theme.text}`} /></button>
-          </div>
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className={`rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto ${theme.card}`}>
+          <div className={`p-4 border-b flex justify-between ${theme.border}`}><h3 className={`font-bold ${theme.text}`}>Consumo</h3><button onClick={() => setModal(null)}><X className={`w-5 h-5 ${theme.text}`} /></button></div>
           <div className="p-4 space-y-4">
             <select value={cuentaId} onChange={e => setCuentaId(e.target.value)} className={`w-full p-3 border rounded-xl ${theme.input}`}>
               <option value="">Cuenta...</option>
               {cuentasContables.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
             </select>
-            <input type="text" value={descripcion} onChange={e => setDescripcion(e.target.value)} placeholder="Descripción" className={`w-full p-3 border rounded-xl ${theme.input}`} />
-            
-            {tipoQuotas === 'sin' && (
-              <input type="number" value={monto} onChange={e => setMonto(e.target.value)} placeholder="Monto" className={`w-full p-3 border rounded-xl ${theme.input}`} />
+            <input type="text" value={desc} onChange={e => setDesc(e.target.value)} placeholder="Descripción" className={`w-full p-3 border rounded-xl ${theme.input}`} />
+            <input type="number" value={monto} onChange={e => setMonto(e.target.value)} placeholder="Monto" className={`w-full p-3 border rounded-xl ${theme.input}`} />
+            {!esCuota && <select value={cat} onChange={e => setCat(e.target.value)} className={`w-full p-3 border rounded-xl ${theme.input}`}>{CATEGORIAS.map(c => <option key={c.id} value={c.id}>{c.icon} {c.nombre}</option>)}</select>}
+            <DateInput label="Fecha" value={fecha} onChange={setFecha} theme={theme} />
+            <label className={`flex items-center gap-3 p-3 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
+              <input type="checkbox" checked={esCuota} onChange={e => setEsCuota(e.target.checked)} className="w-5 h-5" />
+              <span className={theme.text}>Es en cuotas</span>
+            </label>
+            {esCuota && (
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className={`text-sm ${theme.textMuted}`}>Cuota actual</label><input type="number" value={cuotaActual} onChange={e => setCuotaActual(e.target.value)} className={`w-full p-3 border rounded-xl ${theme.input}`} /></div>
+                <div><label className={`text-sm ${theme.textMuted}`}>Total cuotas</label><input type="number" value={cuotasTotales} onChange={e => setCuotasTotales(e.target.value)} className={`w-full p-3 border rounded-xl ${theme.input}`} /></div>
+              </div>
             )}
-
-            <select value={categoria} onChange={e => setCategoria(e.target.value)} className={`w-full p-3 border rounded-xl ${theme.input}`}>
-              {CATEGORIAS.filter(c => c.id !== 'cuota').map(c => <option key={c.id} value={c.id}>{c.icon} {c.nombre}</option>)}
-            </select>
-            
-            <DatePicker label="Fecha" value={fecha} onChange={setFecha} darkMode={darkMode} theme={theme} />
-
-            {/* SISTEMA DE CUOTAS MEJORADO */}
-            <div className={`p-3 rounded-xl border ${theme.border}`}>
-              <div className={`text-sm font-medium ${theme.text} mb-3`}>Cargar en Cuotas</div>
-              <select value={tipoQuotas} onChange={e => setTipoQuotas(e.target.value)} className={`w-full p-3 border rounded-xl ${theme.input} mb-3`}>
-                <option value="sin">Sin cuotas - Monto único</option>
-                <option value="totalYCantidad">Opción 1: Total monto + Cantidad de cuotas</option>
-                <option value="montoPorCuota">Opción 2: Monto por cuota + Cantidad + Número actual</option>
-              </select>
-
-              {/* OPCIÓN 1: TOTAL Y CANTIDAD */}
-              {tipoQuotas === 'totalYCantidad' && (
-                <div className="space-y-3">
-                  <div>
-                    <label className={`text-xs ${theme.textMuted}`}>Monto Total</label>
-                    <input type="number" value={montoTotal} onChange={e => setMontoTotal(e.target.value)} placeholder="Ej: 120000" className={`w-full p-3 border rounded-xl ${theme.input}`} />
-                  </div>
-                  <div>
-                    <label className={`text-xs ${theme.textMuted}`}>Cantidad de Cuotas</label>
-                    <input type="number" value={cantidadQuotas} onChange={e => setCantidadQuotas(e.target.value)} placeholder="Ej: 12" className={`w-full p-3 border rounded-xl ${theme.input}`} />
-                  </div>
-                  {montoPorCuotaCalculado1 > 0 && (
-                    <div className={`p-3 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-blue-50'}`}>
-                      <div className={`text-xs ${theme.textMuted}`}>Monto por cuota:</div>
-                      <div className={`text-xl font-bold text-blue-500`}>{formatCurrency(montoPorCuotaCalculado1)}</div>
-                      <div className={`text-xs ${theme.textMuted} mt-2`}>Se cargará 1 cuota cada mes durante {cantidadQuotas} meses</div>
-                      <div className={`text-xs ${theme.textMuted} mt-1`}>Ejemplo: AIRE ACONDICIONADO $10.000 (1/12), (2/12)... (12/12)</div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* OPCIÓN 2: MONTO POR CUOTA */}
-              {tipoQuotas === 'montoPorCuota' && (
-                <div className="space-y-3">
-                  <div>
-                    <label className={`text-xs ${theme.textMuted}`}>Monto por Cuota</label>
-                    <input type="number" value={montoPorCuota} onChange={e => setMontoPorCuota(e.target.value)} placeholder="Ej: 10000" className={`w-full p-3 border rounded-xl ${theme.input}`} />
-                  </div>
-                  <div>
-                    <label className={`text-xs ${theme.textMuted}`}>Total de Cuotas</label>
-                    <input type="number" value={cantidadQuotas} onChange={e => setCantidadQuotas(e.target.value)} placeholder="Ej: 12" className={`w-full p-3 border rounded-xl ${theme.input}`} />
-                  </div>
-                  <div>
-                    <label className={`text-xs ${theme.textMuted}`}>Número de Cuota Actual (desde dónde empiezas)</label>
-                    <input type="number" value={numeroCuotaActual} onChange={e => setNumeroCuotaActual(e.target.value)} min="1" className={`w-full p-3 border rounded-xl ${theme.input}`} placeholder="Ej: 1" />
-                  </div>
-                  {montoPorCuota && cantidadQuotas && numeroCuotaActual && (
-                    <div className={`p-3 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-blue-50'}`}>
-                      <div className={`text-xs ${theme.textMuted}`}>Monto por cuota:</div>
-                      <div className={`text-xl font-bold text-blue-500`}>{formatCurrency(montoPorCuota)}</div>
-                      <div className={`text-xs ${theme.textMuted} mt-2`}>Cuotas pendientes: {cuotasRestantes} (de {cantidadQuotas})</div>
-                      <div className={`text-xs ${theme.textMuted} mt-1`}>Se cargarán desde cuota {numeroCuotaActual} hasta {cantidadQuotas}</div>
-                      <div className={`text-xs ${theme.textMuted} mt-1`}>Ejemplo: AIRE ACONDICIONADO $10.000 (6/12), (7/12)... (12/12)</div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* DÉBITOS AUTOMÁTICOS */}
-            <div className={`p-3 rounded-xl border ${theme.border}`}>
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input type="checkbox" checked={esDebito} onChange={e => setEsDebito(e.target.checked)} disabled={tipoQuotas !== 'sin'} className="w-4 h-4" />
-                <span className={`text-sm font-medium ${tipoQuotas !== 'sin' ? theme.textMuted : theme.text}`}>
-                  Débito automático (solo para consumos sin cuotas)
-                </span>
-              </label>
-            </div>
           </div>
           <div className={`p-4 border-t flex gap-3 ${theme.border}`}>
             <button onClick={() => setModal(null)} className={`flex-1 p-3 border rounded-xl ${theme.border} ${theme.text}`}>Cancelar</button>
-            <button onClick={guardar} disabled={
-              !cuentaId || !descripcion || !fecha ||
-              (tipoQuotas === 'sin' && !monto) ||
-              (tipoQuotas === 'totalYCantidad' && (!montoTotal || !cantidadQuotas)) ||
-              (tipoQuotas === 'montoPorCuota' && (!montoPorCuota || !cantidadQuotas || !numeroCuotaActual))
-            } className="flex-1 p-3 bg-amber-500 text-white rounded-xl disabled:opacity-50">Cargar</button>
+            <button onClick={guardar} disabled={!cuentaId || !monto || !desc} className="flex-1 p-3 bg-amber-600 text-white rounded-xl disabled:opacity-50">Guardar</button>
           </div>
         </div>
       </div>
@@ -996,96 +684,88 @@ const MonityApp = () => {
 
   const ModalPago = () => {
     const [cuentaId, setCuentaId] = useState('');
-    const [descripcion, setDescripcion] = useState('');
     const [monto, setMonto] = useState('');
-    const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
-    const [tipoPago, setTipoPago] = useState('periodo'); // 'periodo' o 'deuda'
-    
-    const deudaCuenta = cuentaId ? calcularDeudaReal(cuentaId) : 0;
-    const saldoPeriodoCuenta = cuentaId ? calcularSaldoPeriodo(cuentaId) : 0;
-    const totalCuenta = deudaCuenta + saldoPeriodoCuenta;
-    
+    const [fecha, setFecha] = useState(new Date().toISOString().slice(0,10));
+    const [tipoPago, setTipoPago] = useState('periodo');
+    const [seleccionados, setSeleccionados] = useState([]);
+    const [pagarTodo, setPagarTodo] = useState(true);
+
+    const cuenta = cuentas.find(c => c.id === cuentaId);
+    const deuda = cuentaId ? getDeudaReal(cuentaId) : 0;
+    const saldoP = cuentaId ? getSaldoPeriodo(cuentaId) : 0;
+    const p = cuenta ? getPeriodo(cuenta) : null;
+    const consumos = p ? movimientos.filter(m => m.cuentaId === cuentaId && m.fecha >= p.inicio && m.fecha <= p.fin && !m.periodoCerrado && !m.pagado) : [];
+
+    const toggleSel = (id) => { setSeleccionados(seleccionados.includes(id) ? seleccionados.filter(s => s !== id) : [...seleccionados, id]); setPagarTodo(false); };
+    const selTodos = () => { if(pagarTodo) { setSeleccionados([]); setPagarTodo(false); } else { setSeleccionados(consumos.map(c => c.id)); setPagarTodo(true); }};
+    const montoSel = pagarTodo ? saldoP : consumos.filter(c => seleccionados.includes(c.id)).reduce((s,c) => s + c.monto, 0);
+
+    const guardar = async () => {
+      if (!cuentaId || !monto) return;
+      await guardarPago({ cuentaId, descripcion: tipoPago === 'deuda' ? 'Pago deuda' : 'Pago período', monto: parseFloat(monto), fecha, esParaDeuda: tipoPago === 'deuda', consumosPagados: tipoPago === 'periodo' && !pagarTodo ? seleccionados : [] });
+      if (tipoPago === 'periodo' && !pagarTodo && seleccionados.length > 0) {
+        for (const id of seleccionados) await actualizarMovimiento(id, { pagado: true });
+      }
+      setModal(null);
+    };
+
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
         <div className={`rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto ${theme.card}`}>
-          <div className={`p-4 border-b flex justify-between ${theme.border}`}><h3 className={`font-bold ${theme.text}`}>Cargar Pago</h3><button onClick={() => setModal(null)}><X className={`w-5 h-5 ${theme.text}`} /></button></div>
+          <div className={`p-4 border-b flex justify-between ${theme.border}`}><h3 className={`font-bold ${theme.text}`}>Pago</h3><button onClick={() => setModal(null)}><X className={`w-5 h-5 ${theme.text}`} /></button></div>
           <div className="p-4 space-y-4">
-            <select value={cuentaId} onChange={e => setCuentaId(e.target.value)} className={`w-full p-3 border rounded-xl ${theme.input}`}>
-              <option value="">Seleccionar cuenta...</option>
+            <select value={cuentaId} onChange={e => { setCuentaId(e.target.value); setSeleccionados([]); setPagarTodo(true); }} className={`w-full p-3 border rounded-xl ${theme.input}`}>
+              <option value="">Cuenta...</option>
               {cuentasContables.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
             </select>
-            
             {cuentaId && (
               <>
-                {/* Resumen de la cuenta */}
                 <div className={`p-3 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
-                  <div className="grid grid-cols-3 gap-2 text-center text-sm">
-                    <div>
-                      <div className={theme.textMuted}>Deuda</div>
-                      <div className={`font-bold ${deudaCuenta > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(deudaCuenta)}</div>
-                    </div>
-                    <div>
-                      <div className={theme.textMuted}>Período</div>
-                      <div className={`font-bold ${saldoPeriodoCuenta > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>{formatCurrency(saldoPeriodoCuenta)}</div>
-                    </div>
-                    <div>
-                      <div className={theme.textMuted}>Total</div>
-                      <div className={`font-bold ${totalCuenta > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(totalCuenta)}</div>
-                    </div>
+                  <div className="grid grid-cols-2 gap-2 text-center text-sm">
+                    <div><div className={theme.textMuted}>Deuda</div><div className={`font-bold ${deuda > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(deuda)}</div></div>
+                    <div><div className={theme.textMuted}>Período</div><div className={`font-bold ${saldoP > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>{formatCurrency(saldoP)}</div></div>
                   </div>
                 </div>
-
-                {/* Tipo de pago */}
-                <div className={`p-3 rounded-xl border-2 ${tipoPago === 'deuda' ? 'border-rose-500' : 'border-blue-500'} ${darkMode ? 'bg-gray-700' : 'bg-slate-50'}`}>
-                  <p className={`text-sm font-semibold mb-3 ${theme.text}`}>¿A qué corresponde este pago?</p>
-                  <div className="space-y-2">
-                    <label className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer ${tipoPago === 'periodo' ? (darkMode ? 'bg-blue-900' : 'bg-blue-100') : ''}`}>
-                      <input type="radio" checked={tipoPago === 'periodo'} onChange={() => setTipoPago('periodo')} className="w-4 h-4" />
-                      <div>
-                        <span className={`font-medium ${theme.text}`}>Pago del período actual</span>
-                        <p className={`text-xs ${theme.textMuted}`}>Para consumos de este mes</p>
-                      </div>
-                    </label>
-                    <label className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer ${tipoPago === 'deuda' ? (darkMode ? 'bg-rose-900' : 'bg-rose-100') : ''} ${deudaCuenta <= 0 ? 'opacity-50' : ''}`}>
-                      <input type="radio" checked={tipoPago === 'deuda'} onChange={() => setTipoPago('deuda')} disabled={deudaCuenta <= 0} className="w-4 h-4" />
-                      <div>
-                        <span className={`font-medium ${theme.text}`}>Pago de deuda anterior</span>
-                        <p className={`text-xs ${theme.textMuted}`}>Para períodos vencidos ({formatCurrency(deudaCuenta)})</p>
-                      </div>
-                    </label>
-                  </div>
+                <div className={`p-3 rounded-xl border-2 ${tipoPago === 'deuda' ? 'border-rose-500' : 'border-blue-500'}`}>
+                  <p className={`text-sm font-semibold mb-3 ${theme.text}`}>Tipo de pago</p>
+                  <label className={`flex items-center gap-3 p-2 rounded-lg mb-2 ${tipoPago === 'periodo' ? (darkMode ? 'bg-blue-900' : 'bg-blue-100') : ''}`}>
+                    <input type="radio" checked={tipoPago === 'periodo'} onChange={() => setTipoPago('periodo')} /><span className={theme.text}>Pago del período</span>
+                  </label>
+                  <label className={`flex items-center gap-3 p-2 rounded-lg ${tipoPago === 'deuda' ? (darkMode ? 'bg-rose-900' : 'bg-rose-100') : ''} ${deuda <= 0 ? 'opacity-50' : ''}`}>
+                    <input type="radio" checked={tipoPago === 'deuda'} onChange={() => setTipoPago('deuda')} disabled={deuda <= 0} /><span className={theme.text}>Pago de deuda ({formatCurrency(deuda)})</span>
+                  </label>
                 </div>
+                {tipoPago === 'periodo' && consumos.length > 0 && (
+                  <div className={`p-3 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
+                    <div className="flex justify-between items-center mb-3">
+                      <span className={`font-semibold ${theme.text}`}>Consumos</span>
+                      <button onClick={selTodos} className="text-sm text-blue-500">{pagarTodo ? 'Seleccionar' : 'Pagar todo'}</button>
+                    </div>
+                    {!pagarTodo && (
+                      <div className="space-y-2 max-h-40 overflow-y-auto">
+                        {consumos.map(c => (
+                          <label key={c.id} className={`flex items-center gap-3 p-2 rounded-lg ${seleccionados.includes(c.id) ? (darkMode ? 'bg-blue-900' : 'bg-blue-100') : ''}`}>
+                            <button onClick={() => toggleSel(c.id)}>{seleccionados.includes(c.id) ? <CheckSquare className="w-5 h-5 text-blue-500" /> : <Square className="w-5 h-5" />}</button>
+                            <span className={`flex-1 text-sm ${theme.text}`}>{c.descripcion}</span>
+                            <span className="text-rose-500">{formatCurrency(c.monto)}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                    <div className={`mt-2 pt-2 border-t ${theme.border} flex justify-between`}>
+                      <span className={theme.textMuted}>Seleccionado:</span>
+                      <span className="font-bold text-amber-500">{formatCurrency(montoSel)}</span>
+                    </div>
+                  </div>
+                )}
               </>
             )}
-            
-            <input type="text" value={descripcion} onChange={e => setDescripcion(e.target.value)} placeholder="Descripción (opcional)" className={`w-full p-3 border rounded-xl ${theme.input}`} />
             <input type="number" value={monto} onChange={e => setMonto(e.target.value)} placeholder="Monto" className={`w-full p-3 border rounded-xl ${theme.input}`} />
-            <DatePicker label="Fecha" value={fecha} onChange={setFecha} darkMode={darkMode} theme={theme} />
+            <DateInput label="Fecha" value={fecha} onChange={setFecha} theme={theme} />
           </div>
           <div className={`p-4 border-t flex gap-3 ${theme.border}`}>
             <button onClick={() => setModal(null)} className={`flex-1 p-3 border rounded-xl ${theme.border} ${theme.text}`}>Cancelar</button>
-            <button 
-              onClick={async () => { 
-                if (!cuentaId || !monto || parseFloat(monto) <= 0) return;
-                try {
-                  await guardarPago({ 
-                    cuentaId, 
-                    descripcion: descripcion || (tipoPago === 'deuda' ? 'Pago deuda' : 'Pago período'), 
-                    monto: parseFloat(monto), 
-                    fecha,
-                    esParaDeuda: tipoPago === 'deuda'
-                  }); 
-                  setModal(null); 
-                } catch (error) {
-                  console.error('Error al guardar pago:', error);
-                  alert('Error al guardar el pago');
-                }
-              }} 
-              disabled={!cuentaId || !monto || parseFloat(monto) <= 0} 
-              className={`flex-1 p-3 text-white rounded-xl disabled:opacity-50 ${tipoPago === 'deuda' ? 'bg-rose-600' : 'bg-blue-600'}`}
-            >
-              {tipoPago === 'deuda' ? 'Pagar Deuda' : 'Registrar Pago'}
-            </button>
+            <button onClick={guardar} disabled={!cuentaId || !monto} className={`flex-1 p-3 text-white rounded-xl disabled:opacity-50 ${tipoPago === 'deuda' ? 'bg-rose-600' : 'bg-blue-600'}`}>Registrar</button>
           </div>
         </div>
       </div>
@@ -1093,22 +773,25 @@ const MonityApp = () => {
   };
 
   const ModalEditarMov = () => {
-    const [desc, setDesc] = useState(movimientoEditar?.descripcion || '');
-    const [monto, setMonto] = useState(movimientoEditar?.monto?.toString() || '');
-    const [cat, setCat] = useState(movimientoEditar?.categoria || 'otros');
-    const [fecha, setFecha] = useState(movimientoEditar?.fecha || '');
-    if (!movimientoEditar) return null;
+    const [desc, setDesc] = useState(movEditar?.descripcion || '');
+    const [monto, setMonto] = useState(movEditar?.monto?.toString() || '');
+    const [cat, setCat] = useState(movEditar?.categoria || 'otros');
+    const [fecha, setFecha] = useState(movEditar?.fecha || '');
+    if (!movEditar) return null;
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
         <div className={`rounded-2xl w-full max-w-lg ${theme.card}`}>
-          <div className={`p-4 border-b flex justify-between ${theme.border}`}><h3 className={`font-bold ${theme.text}`}>Editar Consumo</h3><button onClick={() => { setModal(null); setMovimientoEditar(null); }}><X className={`w-5 h-5 ${theme.text}`} /></button></div>
+          <div className={`p-4 border-b flex justify-between ${theme.border}`}><h3 className={`font-bold ${theme.text}`}>Editar Consumo</h3><button onClick={() => { setModal(null); setMovEditar(null); }}><X className={`w-5 h-5 ${theme.text}`} /></button></div>
           <div className="p-4 space-y-4">
-            <input type="text" value={desc} onChange={e => setDesc(e.target.value)} placeholder="Descripción" className={`w-full p-3 border rounded-xl ${theme.input}`} />
-            <input type="number" value={monto} onChange={e => setMonto(e.target.value)} placeholder="Monto" className={`w-full p-3 border rounded-xl ${theme.input}`} />
+            <input type="text" value={desc} onChange={e => setDesc(e.target.value)} className={`w-full p-3 border rounded-xl ${theme.input}`} />
+            <input type="number" value={monto} onChange={e => setMonto(e.target.value)} className={`w-full p-3 border rounded-xl ${theme.input}`} />
             <select value={cat} onChange={e => setCat(e.target.value)} className={`w-full p-3 border rounded-xl ${theme.input}`}>{CATEGORIAS.map(c => <option key={c.id} value={c.id}>{c.icon} {c.nombre}</option>)}</select>
-            <DatePicker label="Fecha" value={fecha} onChange={setFecha} darkMode={darkMode} theme={theme} />
+            <DateInput label="Fecha" value={fecha} onChange={setFecha} theme={theme} />
           </div>
-          <div className={`p-4 border-t flex gap-3 ${theme.border}`}><button onClick={() => { setModal(null); setMovimientoEditar(null); }} className={`flex-1 p-3 border rounded-xl ${theme.border} ${theme.text}`}>Cancelar</button><button onClick={async () => { await actualizarMovimiento(movimientoEditar.id, { descripcion: desc, monto: parseFloat(monto), categoria: cat, fecha }); setModal(null); setMovimientoEditar(null); }} className="flex-1 p-3 bg-blue-600 text-white rounded-xl">Guardar</button></div>
+          <div className={`p-4 border-t flex gap-3 ${theme.border}`}>
+            <button onClick={() => { setModal(null); setMovEditar(null); }} className={`flex-1 p-3 border rounded-xl ${theme.border} ${theme.text}`}>Cancelar</button>
+            <button onClick={async () => { await actualizarMovimiento(movEditar.id, { descripcion: desc, monto: parseFloat(monto), categoria: cat, fecha }); setModal(null); setMovEditar(null); }} className="flex-1 p-3 bg-blue-600 text-white rounded-xl">Guardar</button>
+          </div>
         </div>
       </div>
     );
@@ -1124,9 +807,9 @@ const MonityApp = () => {
         <div className={`rounded-2xl w-full max-w-lg ${theme.card}`}>
           <div className={`p-4 border-b flex justify-between ${theme.border}`}><h3 className={`font-bold ${theme.text}`}>Editar Pago</h3><button onClick={() => { setModal(null); setPagoEditar(null); }}><X className={`w-5 h-5 ${theme.text}`} /></button></div>
           <div className="p-4 space-y-4">
-            <input type="text" value={desc} onChange={e => setDesc(e.target.value)} placeholder="Descripción" className={`w-full p-3 border rounded-xl ${theme.input}`} />
-            <input type="number" value={monto} onChange={e => setMonto(e.target.value)} placeholder="Monto" className={`w-full p-3 border rounded-xl ${theme.input}`} />
-            <DatePicker label="Fecha" value={fecha} onChange={setFecha} darkMode={darkMode} theme={theme} />
+            <input type="text" value={desc} onChange={e => setDesc(e.target.value)} className={`w-full p-3 border rounded-xl ${theme.input}`} />
+            <input type="number" value={monto} onChange={e => setMonto(e.target.value)} className={`w-full p-3 border rounded-xl ${theme.input}`} />
+            <DateInput label="Fecha" value={fecha} onChange={setFecha} theme={theme} />
           </div>
           <div className={`p-4 border-t flex gap-3 ${theme.border}`}>
             <button onClick={() => { setModal(null); setPagoEditar(null); }} className={`flex-1 p-3 border rounded-xl ${theme.border} ${theme.text}`}>Cancelar</button>
@@ -1150,371 +833,103 @@ const MonityApp = () => {
           <div className="p-4 space-y-4">
             <input type="text" value={desc} onChange={e => setDesc(e.target.value)} placeholder="Descripción" className={`w-full p-3 border rounded-xl ${theme.input}`} />
             <input type="number" value={monto} onChange={e => setMonto(e.target.value)} placeholder="Monto/cuota" className={`w-full p-3 border rounded-xl ${theme.input}`} />
-            <div className="grid grid-cols-2 gap-4"><div><label className={`text-sm ${theme.textMuted}`}>Totales</label><input type="number" value={total} onChange={e => setTotal(e.target.value)} className={`w-full p-3 border rounded-xl ${theme.input}`} /></div><div><label className={`text-sm ${theme.textMuted}`}>Pendientes</label><input type="number" value={pend} onChange={e => setPend(e.target.value)} className={`w-full p-3 border rounded-xl ${theme.input}`} /></div></div>
+            <div className="grid grid-cols-2 gap-4">
+              <div><label className={`text-sm ${theme.textMuted}`}>Totales</label><input type="number" value={total} onChange={e => setTotal(e.target.value)} className={`w-full p-3 border rounded-xl ${theme.input}`} /></div>
+              <div><label className={`text-sm ${theme.textMuted}`}>Pendientes</label><input type="number" value={pend} onChange={e => setPend(e.target.value)} className={`w-full p-3 border rounded-xl ${theme.input}`} /></div>
+            </div>
           </div>
-          <div className={`p-4 border-t flex gap-3 ${theme.border}`}><button onClick={() => { setModal(null); setCuotaEditar(null); }} className={`flex-1 p-3 border rounded-xl ${theme.border} ${theme.text}`}>Cancelar</button><button onClick={async () => { await actualizarCuota(cuotaEditar.id, { descripcion: desc, montoCuota: parseFloat(monto), cuotasTotales: parseInt(total), cuotasPendientes: parseInt(pend), estado: parseInt(pend) <= 0 ? 'finalizada' : 'activa' }); setModal(null); setCuotaEditar(null); }} className="flex-1 p-3 bg-purple-600 text-white rounded-xl">Guardar</button></div>
+          <div className={`p-4 border-t flex gap-3 ${theme.border}`}>
+            <button onClick={() => { setModal(null); setCuotaEditar(null); }} className={`flex-1 p-3 border rounded-xl ${theme.border} ${theme.text}`}>Cancelar</button>
+            <button onClick={async () => { await actualizarCuota(cuotaEditar.id, { descripcion: desc, montoCuota: parseFloat(monto), cuotasTotales: parseInt(total), cuotasPendientes: parseInt(pend), estado: parseInt(pend) <= 0 ? 'finalizada' : 'activa' }); setModal(null); setCuotaEditar(null); }} className="flex-1 p-3 bg-purple-600 text-white rounded-xl">Guardar</button>
+          </div>
         </div>
       </div>
     );
   };
 
-  // MODAL PARA CERRAR PERÍODO CON OPCIÓN DE PAGO
-  const ModalCerrarPeriodoConPago = () => {
-    const cuentaId = modalCerrarPeriodo?.cuentaId;
-    const periodo = modalCerrarPeriodo?.periodo;
-    const cuenta = cuentas.find(c => c.id === cuentaId);
-    
-    if (!periodo || !cuentaId) return null;
-
-    // Calcular valores EN TIEMPO REAL
-    const consumosDelPeriodo = movimientos
-      .filter(m => m.cuentaId === cuentaId && !m.esCuota && !m.esSaldoAnterior)
-      .reduce((s, m) => s + (m.monto || 0), 0);
-    
-    const cuotasDelPeriodo = movimientos
-      .filter(m => m.cuentaId === cuentaId && m.esCuota)
-      .reduce((s, m) => s + (m.monto || 0), 0);
-    
-    const pagosDelPeriodo = pagos
-      .filter(p => p.cuentaId === cuentaId && !p.esParaDeuda)
-      .reduce((s, p) => s + (p.monto || 0), 0);
-    
-    const totalConsumos = consumosDelPeriodo + cuotasDelPeriodo;
-    const saldoPeriodo = totalConsumos - pagosDelPeriodo;
-    const deudaActual = cuenta?.deudaAcumulada || 0;
-
-    const montoPagoNum = parseFloat(pagoAlCerrar) || 0;
-    const saldoDespuesPago = Math.max(0, saldoPeriodo - montoPagoNum);
-    const nuevaDeudaTotal = deudaActual + saldoDespuesPago;
+  const ModalCerrar = () => {
+    const [montoPago, setMontoPago] = useState('');
+    const [cierreProx, setCierreProx] = useState('');
+    const [vencProx, setVencProx] = useState('');
+    if (!modalCierre) return null;
+    const c = modalCierre.cuenta;
+    const consumos = getConsumosPeriodo(c.id);
+    const pagosP = getPagosPeriodo(c.id);
+    const saldo = consumos - pagosP;
+    const deudaAnt = getDeuda(c.id);
+    const pagoNum = parseFloat(montoPago) || 0;
+    const restante = Math.max(0, saldo - pagoNum);
+    const nuevaDeuda = deudaAnt + restante;
 
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-        <div className={`rounded-2xl w-full max-w-lg my-4 ${theme.card}`}>
-          <div className={`p-4 border-b flex justify-between ${theme.border}`}>
-            <h3 className={`font-bold ${theme.text}`}>Cerrar Período</h3>
-            <button onClick={() => { setModalCerrarPeriodo(null); setPagoAlCerrar(''); }}><X className={`w-5 h-5 ${theme.text}`} /></button>
-          </div>
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className={`rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto ${theme.card}`}>
+          <div className={`p-4 border-b flex justify-between ${theme.border}`}><h3 className={`font-bold ${theme.text}`}>Cerrar Período - {c.nombre}</h3><button onClick={() => setModalCierre(null)}><X className={`w-5 h-5 ${theme.text}`} /></button></div>
           <div className="p-4 space-y-4">
-            {/* Resumen del período */}
-            <div className={`p-4 rounded-2xl ${darkMode ? 'bg-gray-700' : 'bg-slate-50'}`}>
-              <h4 className={`font-semibold ${theme.text} mb-3`}>Resumen del Período</h4>
+            <div className={`p-4 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
+              <h4 className={`font-semibold mb-3 ${theme.text}`}>Resumen</h4>
               <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className={theme.textMuted}>Consumos:</span>
-                  <span className={`font-semibold text-rose-500`}>{formatCurrency(consumosDelPeriodo)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className={theme.textMuted}>Cuotas:</span>
-                  <span className={`font-semibold text-purple-500`}>{formatCurrency(cuotasDelPeriodo)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className={theme.textMuted}>Pagos realizados:</span>
-                  <span className={`font-semibold text-emerald-500`}>-{formatCurrency(pagosDelPeriodo)}</span>
-                </div>
-                <div className={`border-t ${theme.border} pt-2 mt-2 flex justify-between`}>
-                  <span className={`font-semibold ${theme.text}`}>Saldo a Pagar:</span>
-                  <span className={`text-lg font-bold ${saldoPeriodo > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(saldoPeriodo)}</span>
-                </div>
+                <div className="flex justify-between"><span className={theme.textMuted}>Consumos:</span><span className="text-rose-500 font-semibold">{formatCurrency(consumos)}</span></div>
+                <div className="flex justify-between"><span className={theme.textMuted}>Pagos:</span><span className="text-emerald-500 font-semibold">-{formatCurrency(pagosP)}</span></div>
+                <div className={`flex justify-between pt-2 border-t ${theme.border}`}><span className={`font-semibold ${theme.text}`}>Saldo:</span><span className={`font-bold text-lg ${saldo > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(saldo)}</span></div>
               </div>
             </div>
-
-            {/* Deuda actual */}
-            {deudaActual > 0 && (
-              <div className={`p-3 rounded-xl ${darkMode ? 'bg-rose-900/30' : 'bg-rose-50'} border border-rose-500`}>
-                <div className="flex justify-between items-center">
-                  <span className={`text-sm ${theme.text}`}>Deuda acumulada anterior:</span>
-                  <span className="font-bold text-rose-500">{formatCurrency(deudaActual)}</span>
-                </div>
-              </div>
-            )}
-
-            {/* Pago al cerrar */}
-            <div className={`p-4 rounded-2xl border-2 border-amber-500 ${darkMode ? 'bg-amber-900/20' : 'bg-amber-50'}`}>
-              <p className={`text-sm font-semibold ${theme.text} mb-3`}>¿Cuánto vas a pagar ahora?</p>
-              <input 
-                type="number" 
-                value={pagoAlCerrar}
-                onChange={e => setPagoAlCerrar(e.target.value)}
-                placeholder="0"
-                className={`w-full p-3 border rounded-xl ${theme.input}`}
-              />
-              
-              {saldoPeriodo > 0 && (
+            {deudaAnt > 0 && <div className={`p-3 rounded-xl border border-rose-500 ${darkMode ? 'bg-rose-900/20' : 'bg-rose-50'}`}><div className="flex justify-between"><span className={theme.text}>Deuda anterior:</span><span className="font-bold text-rose-500">{formatCurrency(deudaAnt)}</span></div></div>}
+            <div className={`p-4 rounded-xl border-2 border-amber-500 ${darkMode ? 'bg-amber-900/20' : 'bg-amber-50'}`}>
+              <p className={`font-semibold mb-3 ${theme.text}`}>¿Cuánto pagás?</p>
+              <input type="number" value={montoPago} onChange={e => setMontoPago(e.target.value)} placeholder="0" className={`w-full p-3 border rounded-xl ${theme.input}`} />
+              {saldo > 0 && (
                 <div className={`mt-3 p-3 rounded-xl ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-                  <div className="flex justify-between mb-2 text-sm">
-                    <span className={theme.textMuted}>Saldo del período:</span>
-                    <span className={`font-semibold text-rose-500`}>{formatCurrency(saldoPeriodo)}</span>
-                  </div>
-                  <div className="flex justify-between mb-2 text-sm">
-                    <span className={theme.textMuted}>Tu pago:</span>
-                    <span className={`font-semibold text-emerald-500`}>-{formatCurrency(montoPagoNum)}</span>
-                  </div>
-                  <div className={`border-t ${theme.border} pt-2 flex justify-between`}>
-                    <span className={`font-semibold text-sm ${theme.text}`}>Se suma a deuda:</span>
-                    <span className={`font-bold ${saldoDespuesPago > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
-                      {formatCurrency(saldoDespuesPago)}
-                    </span>
-                  </div>
-                  {saldoDespuesPago > 0 && (
-                    <div className={`mt-2 pt-2 border-t ${theme.border} flex justify-between`}>
-                      <span className={`text-xs ${theme.textMuted}`}>Nueva deuda total:</span>
-                      <span className="font-bold text-rose-500">{formatCurrency(nuevaDeudaTotal)}</span>
-                    </div>
-                  )}
+                  <div className="flex justify-between mb-2 text-sm"><span className={theme.textMuted}>Saldo:</span><span className="text-rose-500">{formatCurrency(saldo)}</span></div>
+                  <div className="flex justify-between mb-2 text-sm"><span className={theme.textMuted}>Pago:</span><span className="text-emerald-500">-{formatCurrency(pagoNum)}</span></div>
+                  <div className={`flex justify-between pt-2 border-t ${theme.border}`}><span className={theme.text}>Se suma a deuda:</span><span className={`font-bold ${restante > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(restante)}</span></div>
+                  {restante > 0 && <div className={`flex justify-between mt-2 pt-2 border-t ${theme.border}`}><span className={`text-sm ${theme.textMuted}`}>Nueva deuda:</span><span className="font-bold text-rose-500">{formatCurrency(nuevaDeuda)}</span></div>}
                 </div>
               )}
             </div>
-          </div>
-          <div className={`p-4 border-t flex gap-3 ${theme.border}`}>
-            <button onClick={() => { setModalCerrarPeriodo(null); setPagoAlCerrar(''); }} className={`flex-1 p-3 border rounded-xl ${theme.border} ${theme.text}`}>Cancelar</button>
-            <button onClick={() => cerrarPeriodo(cuentaId, montoPagoNum)} className="flex-1 p-3 bg-indigo-600 text-white rounded-xl font-medium">Cerrar Período</button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // MODAL PARA GESTIONAR DÉBITOS AUTOMÁTICOS
-  const ModalDebitosAutomaticos = () => {
-    const [verLista, setVerLista] = useState(false);
-
-    if (verLista) {
-      return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className={`rounded-2xl w-full max-w-2xl my-4 ${theme.card}`}>
-            <div className={`p-4 border-b flex justify-between ${theme.border}`}>
-              <h3 className={`font-bold ${theme.text}`}>Débitos Automáticos Activos</h3>
-              <button onClick={() => setModal(null)}><X className={`w-5 h-5 ${theme.text}`} /></button>
-            </div>
-            <div className="p-4">
-              {debitosAutomaticos.length === 0 ? (
-                <div className={`text-center ${theme.textMuted}`}>No hay débitos automáticos configurados</div>
-              ) : (
-                <div className="space-y-3">
-                  {debitosAutomaticos.map(debito => (
-                    <div key={debito.id} className={`p-4 rounded-xl border ${theme.border}`}>
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <div className={`font-semibold ${theme.text}`}>{debito.descripcion}</div>
-                          <div className={`text-sm ${theme.textMuted}`}>{cuentasContables.find(c => c.id === debito.cuentaId)?.nombre}</div>
-                          <div className={`text-sm font-bold text-rose-500 mt-1`}>{formatCurrency(debito.monto)}</div>
-                        </div>
-                        <div className="flex gap-2">
-                          <button onClick={() => { setCuentaEditar(debito); setModal('editar-debito'); }} className={`p-2 rounded-lg ${theme.hover}`}>
-                            <Edit3 className="w-4 h-4" />
-                          </button>
-                          <button onClick={() => { if(window.confirm('¿Eliminar este débito automático?')) eliminarDebito(debito.id); }} className="p-2 rounded-lg hover:bg-red-100 dark:hover:bg-red-900">
-                            <Trash2 className="w-4 h-4 text-red-500" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className={`p-4 border-t flex gap-3 ${theme.border}`}>
-              <button onClick={() => setVerLista(false)} className={`flex-1 p-3 border rounded-xl ${theme.border} ${theme.text}`}>Atrás</button>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <div className={`rounded-2xl w-full max-w-lg ${theme.card}`}>
-          <div className={`p-4 border-b flex justify-between ${theme.border}`}>
-            <h3 className={`font-bold ${theme.text}`}>Gestionar Débitos Automáticos</h3>
-            <button onClick={() => setModal(null)}><X className={`w-5 h-5 ${theme.text}`} /></button>
-          </div>
-          <div className="p-4 space-y-3">
-            <button onClick={() => setVerLista(true)} className="w-full p-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700">
-              Ver Débitos Activos ({debitosAutomaticos.length})
-            </button>
-            <button onClick={() => { setModal('consumo'); }} className="w-full p-3 bg-emerald-600 text-white rounded-xl font-medium hover:bg-emerald-700">
-              Crear Nuevo Débito
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const ModalEditarDebito = () => {
-    const [descripcion, setDescripcion] = useState(cuentaEditar?.descripcion || '');
-    const [monto, setMonto] = useState(cuentaEditar?.monto?.toString() || '');
-
-    return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <div className={`rounded-2xl w-full max-w-lg ${theme.card}`}>
-          <div className={`p-4 border-b flex justify-between ${theme.border}`}>
-            <h3 className={`font-bold ${theme.text}`}>Editar Débito Automático</h3>
-            <button onClick={() => { setModal(null); setCuentaEditar(null); }}><X className={`w-5 h-5 ${theme.text}`} /></button>
-          </div>
-          <div className="p-4 space-y-4">
-            <input type="text" value={descripcion} onChange={e => setDescripcion(e.target.value)} placeholder="Descripción" className={`w-full p-3 border rounded-xl ${theme.input}`} />
-            <input type="number" value={monto} onChange={e => setMonto(e.target.value)} placeholder="Monto" className={`w-full p-3 border rounded-xl ${theme.input}`} />
-          </div>
-          <div className={`p-4 border-t flex gap-3 ${theme.border}`}>
-            <button onClick={() => { setModal(null); setCuentaEditar(null); }} className={`flex-1 p-3 border rounded-xl ${theme.border} ${theme.text}`}>Cancelar</button>
-            <button onClick={async () => { await actualizarDebito(cuentaEditar.id, { descripcion, monto: parseFloat(monto) }); setModal(null); setCuentaEditar(null); }} className="flex-1 p-3 bg-indigo-600 text-white rounded-xl">Guardar</button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const Stats = () => {
-    return (
-      <div className={`p-4 rounded-2xl text-center ${theme.card}`}>
-        <div className={theme.text}>Estadísticas en desarrollo...</div>
-      </div>
-    );
-  };
-
-  const Config = () => {
-    return (
-      <div className="space-y-4">
-        <button onClick={() => setModal('debitos-automaticos')} className={`w-full p-4 rounded-2xl border text-left ${theme.border} ${theme.card} hover:border-indigo-500`}>
-          <div className={`font-semibold ${theme.text}`}>Gestionar Débitos Automáticos</div>
-          <div className={`text-sm ${theme.textMuted}`}>{debitosAutomaticos.length} débitos activos</div>
-        </button>
-        {ultimaVerificacion && (
-          <div className={`p-3 rounded-2xl text-xs ${theme.textMuted}`}>
-            Última verificación: {ultimaVerificacion.toLocaleTimeString('es-AR')}
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const ModalActualizacionDisponible = () => {
-    return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <div className={`rounded-2xl w-full max-w-sm ${theme.card}`}>
-          <div className={`p-4 border-b flex justify-between ${theme.border}`}>
-            <h3 className={`font-bold ${theme.text}`}>🔄 Nueva Versión Disponible</h3>
-          </div>
-          <div className="p-4 space-y-4">
-            <div>
-              <p className={`${theme.text} mb-2`}>Se han agregado nuevas funciones y se han corregido varios errores.</p>
-              <div className={`p-3 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-blue-50'}`}>
-                <p className={`text-sm ${theme.textMuted}`}>Versión actual: {versionActual}</p>
+            <div className={`p-4 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
+              <h4 className={`font-semibold mb-3 ${theme.text}`}>Próximo período</h4>
+              <div className="grid grid-cols-2 gap-3">
+                <DateInput label="Cierre" value={cierreProx} onChange={setCierreProx} theme={theme} />
+                <DateInput label="Vencimiento" value={vencProx} onChange={setVencProx} theme={theme} />
               </div>
             </div>
-            <div className={`p-3 rounded-xl ${darkMode ? 'bg-green-900/20' : 'bg-green-50'}`}>
-              <p className={`text-sm font-medium ${darkMode ? 'text-green-300' : 'text-green-700'}`}>
-                ✓ Actualizar te dará acceso a las últimas mejoras
-              </p>
-            </div>
-            <p className={`text-xs ${theme.textMuted}`}>
-              La actualización se completará en segundos. No necesitas hacer nada más.
-            </p>
           </div>
           <div className={`p-4 border-t flex gap-3 ${theme.border}`}>
-            <button 
-              onClick={() => setActualizacionDisponible(false)} 
-              className={`flex-1 p-3 border rounded-xl ${theme.border} ${theme.text}`}
-            >
-              Más Tarde
-            </button>
-            <button 
-              onClick={aplicarActualizacion}
-              className="flex-1 p-3 bg-green-600 text-white rounded-xl font-medium hover:bg-green-700"
-            >
-              Actualizar Ahora
-            </button>
+            <button onClick={() => setModalCierre(null)} className={`flex-1 p-3 border rounded-xl ${theme.border} ${theme.text}`}>Cancelar</button>
+            <button onClick={() => cerrarPeriodo(c, pagoNum, cierreProx, vencProx)} className="flex-1 p-3 bg-indigo-600 text-white rounded-xl font-medium">Cerrar</button>
           </div>
         </div>
       </div>
     );
   };
 
-  const ModalDetalleDeudas = () => {
-    const todasLasCuentas = cuentasContables.map(cuenta => ({
-      id: cuenta.id,
-      nombre: cuenta.nombre,
-      entidad: cuenta.entidad,
-      tipoCuenta: cuenta.tipoCuenta,
-      deuda: calcularDeudaReal(cuenta.id),
-      consumosPeriodo: calcularConsumosPeriodo(cuenta.id),
-      pagosPeriodo: calcularPagosPeriodo(cuenta.id),
-      pagosDeuda: calcularPagosDeuda(cuenta.id),
-      saldoPeriodo: calcularSaldoPeriodo(cuenta.id)
-    }));
-
-    const totalDeudaGlobal = todasLasCuentas.reduce((s, c) => s + c.deuda, 0);
-    const totalConsumosPeriodoGlobal = todasLasCuentas.reduce((s, c) => s + c.consumosPeriodo, 0);
-    const totalSaldoPeriodoGlobal = todasLasCuentas.reduce((s, c) => s + c.saldoPeriodo, 0);
-
+  const ModalDeudas = () => {
+    const resumen = cuentasContables.map(c => ({ ...c, deuda: getDeudaReal(c.id), periodo: getSaldoPeriodo(c.id), total: getTotal(c.id) }));
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
         <div className={`rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col ${theme.card}`}>
-          <div className={`p-4 border-b flex justify-between shrink-0 ${theme.border}`}>
-            <h3 className={`font-bold ${theme.text}`}>Resumen Financiero</h3>
-            <button onClick={() => setModal(null)}><X className={`w-5 h-5 ${theme.text}`} /></button>
-          </div>
-          
+          <div className={`p-4 border-b flex justify-between ${theme.border}`}><h3 className={`font-bold ${theme.text}`}>Resumen</h3><button onClick={() => setModal(null)}><X className={`w-5 h-5 ${theme.text}`} /></button></div>
           <div className="p-4 overflow-y-auto flex-1">
-            {todasLasCuentas.length === 0 ? (
-              <div className={`text-center ${theme.textMuted}`}>No tienes cuentas registradas</div>
-            ) : (
-              <div className="space-y-3">
-                {todasLasCuentas.map(cuenta => (
-                  <div key={cuenta.id} className={`p-3 rounded-xl border ${theme.border}`}>
-                    <div className="flex items-center gap-3 mb-2">
-                      <EntidadLogo entidad={cuenta.entidad} size={36} />
-                      <div className="flex-1 min-w-0">
-                        <div className={`font-semibold text-sm truncate ${theme.text}`}>{cuenta.nombre}</div>
-                        <div className={`text-xs ${theme.textMuted}`}>{TIPOS_CUENTA.find(t => t.id === cuenta.tipoCuenta)?.nombre}</div>
-                      </div>
-                    </div>
-                    <div className={`grid grid-cols-2 gap-2 text-center text-xs p-2 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
-                      <div>
-                        <div className={theme.textMuted}>Deuda Vencida</div>
-                        <div className={`font-bold ${cuenta.deuda > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(cuenta.deuda)}</div>
-                      </div>
-                      <div>
-                        <div className={theme.textMuted}>Saldo Período</div>
-                        <div className={`font-bold ${cuenta.saldoPeriodo > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>{formatCurrency(cuenta.saldoPeriodo)}</div>
-                      </div>
-                    </div>
-                    <div className={`mt-2 pt-2 border-t ${theme.border} flex justify-between items-center`}>
-                      <span className={`text-xs ${theme.textMuted}`}>Total a pagar</span>
-                      <span className={`font-bold ${(cuenta.deuda + cuenta.saldoPeriodo) > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
-                        {formatCurrency(cuenta.deuda + cuenta.saldoPeriodo)}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+            {resumen.map(c => (
+              <div key={c.id} className={`p-3 rounded-xl border mb-3 ${theme.border}`}>
+                <div className="flex items-center gap-3 mb-2"><EntidadLogo entidad={c.entidad} size={36} /><div className={`font-semibold text-sm ${theme.text}`}>{c.nombre}</div></div>
+                <div className={`grid grid-cols-3 gap-2 text-center text-xs p-2 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
+                  <div><div className={theme.textMuted}>Deuda</div><div className={`font-bold ${c.deuda > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(c.deuda)}</div></div>
+                  <div><div className={theme.textMuted}>Período</div><div className={`font-bold ${c.periodo > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>{formatCurrency(c.periodo)}</div></div>
+                  <div><div className={theme.textMuted}>Total</div><div className={`font-bold ${c.total > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(c.total)}</div></div>
+                </div>
               </div>
-            )}
+            ))}
           </div>
-
-          {/* Resumen total fijo abajo */}
-          <div className={`p-4 border-t shrink-0 ${theme.border}`}>
+          <div className={`p-4 border-t ${theme.border}`}>
             <div className={`p-3 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
-              <div className="grid grid-cols-2 gap-3 text-center mb-3">
-                <div className={`p-2 rounded-lg ${darkMode ? 'bg-rose-900/50' : 'bg-rose-50'}`}>
-                  <div className={`text-xs ${theme.textMuted}`}>Deuda Vencida</div>
-                  <div className="font-bold text-lg text-rose-500">{formatCurrency(totalDeudaGlobal)}</div>
-                  <div className={`text-xs ${theme.textMuted}`}>Períodos anteriores</div>
-                </div>
-                <div className={`p-2 rounded-lg ${darkMode ? 'bg-amber-900/50' : 'bg-amber-50'}`}>
-                  <div className={`text-xs ${theme.textMuted}`}>Consumos Período</div>
-                  <div className="font-bold text-lg text-amber-500">{formatCurrency(totalSaldoPeriodoGlobal)}</div>
-                  <div className={`text-xs ${theme.textMuted}`}>Período actual</div>
-                </div>
-              </div>
-              <div className={`p-2 rounded-lg text-center ${darkMode ? 'bg-indigo-900/50' : 'bg-indigo-50'}`}>
-                <div className={`text-xs ${theme.textMuted}`}>TOTAL A PAGAR</div>
-                <div className={`font-bold text-xl ${(totalDeudaGlobal + totalSaldoPeriodoGlobal) > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
-                  {formatCurrency(totalDeudaGlobal + totalSaldoPeriodoGlobal)}
-                </div>
+              <div className="grid grid-cols-2 gap-3 text-center">
+                <div><div className={`text-xs ${theme.textMuted}`}>Deuda</div><div className="font-bold text-lg text-rose-500">{formatCurrency(totalDeuda)}</div></div>
+                <div><div className={`text-xs ${theme.textMuted}`}>Consumos</div><div className="font-bold text-lg text-amber-500">{formatCurrency(totalConsumos)}</div></div>
               </div>
             </div>
-            <button onClick={() => setModal(null)} className="w-full mt-3 p-3 bg-indigo-600 text-white rounded-xl font-medium">Cerrar</button>
+            <button onClick={() => setModal(null)} className="w-full mt-3 p-3 bg-indigo-600 text-white rounded-xl">Cerrar</button>
           </div>
         </div>
       </div>
@@ -1524,59 +939,43 @@ const MonityApp = () => {
   const tabs = [
     { id: 'dashboard', label: 'Inicio', icon: <Home className="w-5 h-5" /> },
     { id: 'stats', label: 'Stats', icon: <BarChart3 className="w-5 h-5" /> },
-    { id: 'config', label: 'Config', icon: <Sliders className="w-5 h-5" /> }
+    { id: 'config', label: 'Config', icon: <Sliders className="w-5 h-5" /> },
   ];
 
   return (
     <div className={`min-h-screen ${theme.bg}`}>
-      <header className={`border-b sticky top-0 z-40 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-slate-200'}`}>
-        <div className="max-w-5xl mx-auto px-4 py-3 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <MonityLogo size={36} />
-            <div>
-              <h1 className={`font-bold ${theme.text}`}>Monity</h1>
-              <p className={`text-xs ${theme.textMuted}`}>{user.email}</p>
-            </div>
-          </div>
+      <div className={`sticky top-0 z-40 ${theme.card} border-b ${theme.border}`}>
+        <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2"><MonityLogo size={32} /><span className={`font-bold text-lg ${theme.text}`}>Monity</span></div>
           <div className="flex items-center gap-2">
-            <button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded-lg ${theme.hover}`}>
-              {darkMode ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5 text-slate-600" />}
-            </button>
-            {user.photoURL && <img src={user.photoURL} alt="" className="w-8 h-8 rounded-full" />}
-            <button onClick={handleLogout} className={`p-2 ${theme.textMuted}`}>
-              <LogOut className="w-5 h-5" />
-            </button>
+            <button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded-xl ${theme.hover}`}>{darkMode ? <Sun className="w-5 h-5 text-yellow-400" /> : <Moon className="w-5 h-5" />}</button>
+            <button onClick={() => signOut(auth)} className={`p-2 rounded-xl ${theme.hover}`}><LogOut className={`w-5 h-5 ${theme.text}`} /></button>
           </div>
         </div>
-      </header>
-      <main className="max-w-5xl mx-auto px-4 py-6 pb-24">
+      </div>
+      <div className="max-w-lg mx-auto px-4 py-6 pb-24">
         {tab === 'dashboard' && <Dashboard />}
         {tab === 'detalle' && <DetalleCuenta />}
-        {tab === 'stats' && <Stats />}
-        {tab === 'config' && <Config />}
-      </main>
-      <nav className={`fixed bottom-0 left-0 right-0 border-t z-40 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-slate-200'}`}>
-        <div className="max-w-5xl mx-auto flex justify-around py-2">
+        {tab === 'stats' && <div className={`text-center py-12 ${theme.textMuted}`}><BarChart3 className="w-16 h-16 mx-auto mb-4 opacity-50" /><p>Próximamente</p></div>}
+        {tab === 'config' && <div className="space-y-4"><h2 className={`text-lg font-bold ${theme.text}`}>Configuración</h2><div className={`p-4 rounded-xl ${theme.card} border ${theme.border}`}><p className={`text-sm ${theme.textMuted}`}>Usuario: {user?.email}</p></div></div>}
+      </div>
+      <div className={`fixed bottom-0 left-0 right-0 ${theme.card} border-t ${theme.border}`}>
+        <div className="max-w-lg mx-auto flex">
           {tabs.map(t => (
-            <button key={t.id} onClick={() => { setTab(t.id); setCuentaActiva(null); }} className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl ${tab === t.id || (t.id === 'dashboard' && tab === 'detalle') ? (darkMode ? 'text-white bg-gray-700' : 'text-indigo-600 bg-indigo-50') : theme.textMuted}`}>
-              {t.icon}
-              <span className="text-xs">{t.label}</span>
-            </button>
+            <button key={t.id} onClick={() => { setTab(t.id); if(t.id === 'dashboard') setCuentaActiva(null); }} className={`flex-1 py-3 flex flex-col items-center gap-1 ${tab === t.id ? 'text-indigo-500' : theme.textMuted}`}>{t.icon}<span className="text-xs">{t.label}</span></button>
           ))}
         </div>
-      </nav>
+      </div>
+      {modal === 'ingreso' && <ModalIngreso />}
       {modal === 'cuenta' && <ModalCuenta />}
+      {modal === 'editarCuenta' && <ModalEditarCuenta />}
       {modal === 'consumo' && <ModalConsumo />}
       {modal === 'pago' && <ModalPago />}
-      {modal === 'editar-mov' && <ModalEditarMov />}
-      {modal === 'editar-pago' && <ModalEditarPago />}
-      {modal === 'editar-cuota' && <ModalEditarCuota />}
-      {modal === 'debitos-automaticos' && <ModalDebitosAutomaticos />}
-      {modal === 'editar-debito' && <ModalEditarDebito />}
-      {modal === 'detalleDeudas' && <ModalDetalleDeudas />}
-      {modalCerrarPeriodo && <ModalCerrarPeriodoConPago />}
-      {actualizacionDisponible && <ModalActualizacionDisponible />}
-      {alertaActiva && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"><div className={`rounded-2xl w-full max-w-sm p-6 text-center ${theme.card}`}><div className="w-16 h-16 mx-auto mb-4 bg-amber-100 rounded-full flex items-center justify-center"><Bell className="w-8 h-8 text-amber-500" /></div><h3 className={`text-lg font-bold mb-2 ${theme.text}`}>¡Atención!</h3><p className={`mb-6 ${theme.textMuted}`}>{alertaActiva.mensaje}</p><button onClick={() => setAlertaActiva(null)} className="w-full p-3 bg-amber-500 text-white rounded-xl font-medium">Entendido</button></div></div>)}
+      {modal === 'editarMov' && <ModalEditarMov />}
+      {modal === 'editarPago' && <ModalEditarPago />}
+      {modal === 'editarCuota' && <ModalEditarCuota />}
+      {modal === 'deudas' && <ModalDeudas />}
+      {modalCierre && <ModalCerrar />}
     </div>
   );
 };

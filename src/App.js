@@ -218,33 +218,52 @@ const MonityApp = () => {
   const cuentasContables = cuentas.filter(c => c.tipo === 'contable');
   const totalIngresos = cuentasIngreso.reduce((s, c) => s + (c.montoMensual || 0), 0);
 
-  // Período actual: entre cierreAnterior y cierreActual
+  // Período actual: si hay fechas usa el rango, si no usa todos los movimientos no cerrados
+  const tieneFechas = (cuenta) => cuenta?.cierreAnterior && cuenta?.cierreActual;
+  
   const getPeriodo = (cuenta) => ({
-    inicio: cuenta.cierreAnterior || '2020-01-01',
-    fin: cuenta.cierreActual || new Date().toISOString().slice(0, 10)
+    inicio: cuenta?.cierreAnterior || '2000-01-01',
+    fin: cuenta?.cierreActual || '2099-12-31'
   });
 
-  // Consumos del período (solo movimientos dentro del período, no pagados)
+  // Consumos del período - movimientos no cerrados de esta cuenta
   const getConsumosPeriodo = (cuentaId) => {
     const cuenta = cuentas.find(c => c.id === cuentaId);
     if (!cuenta) return 0;
-    const p = getPeriodo(cuenta);
-    return movimientos
-      .filter(m => m.cuentaId === cuentaId && m.fecha >= p.inicio && m.fecha <= p.fin && !m.periodoCerrado)
-      .reduce((s, m) => s + (m.monto || 0), 0);
+    
+    // Si tiene fechas, filtra por período; si no, todos los no cerrados
+    if (tieneFechas(cuenta)) {
+      const p = getPeriodo(cuenta);
+      return movimientos
+        .filter(m => m.cuentaId === cuentaId && !m.periodoCerrado && m.fecha >= p.inicio && m.fecha <= p.fin)
+        .reduce((s, m) => s + (m.monto || 0), 0);
+    } else {
+      // Sin fechas: todos los movimientos no cerrados son "del período"
+      return movimientos
+        .filter(m => m.cuentaId === cuentaId && !m.periodoCerrado)
+        .reduce((s, m) => s + (m.monto || 0), 0);
+    }
   };
 
   // Pagos del período (no de deuda)
   const getPagosPeriodo = (cuentaId) => {
     const cuenta = cuentas.find(c => c.id === cuentaId);
     if (!cuenta) return 0;
-    const p = getPeriodo(cuenta);
-    return pagos
-      .filter(pg => pg.cuentaId === cuentaId && !pg.esParaDeuda && pg.fecha >= p.inicio && pg.fecha <= p.fin)
-      .reduce((s, pg) => s + (pg.monto || 0), 0);
+    
+    if (tieneFechas(cuenta)) {
+      const p = getPeriodo(cuenta);
+      return pagos
+        .filter(pg => pg.cuentaId === cuentaId && !pg.esParaDeuda && pg.fecha >= p.inicio && pg.fecha <= p.fin)
+        .reduce((s, pg) => s + (pg.monto || 0), 0);
+    } else {
+      // Sin fechas: todos los pagos no de deuda
+      return pagos
+        .filter(pg => pg.cuentaId === cuentaId && !pg.esParaDeuda)
+        .reduce((s, pg) => s + (pg.monto || 0), 0);
+    }
   };
 
-  // Saldo del período
+  // Saldo del período = Consumos - Pagos
   const getSaldoPeriodo = (cuentaId) => getConsumosPeriodo(cuentaId) - getPagosPeriodo(cuentaId);
 
   // Deuda acumulada (guardada en cuenta)
@@ -256,10 +275,10 @@ const MonityApp = () => {
   // Pagos a deuda
   const getPagosDeuda = (cuentaId) => pagos.filter(p => p.cuentaId === cuentaId && p.esParaDeuda).reduce((s, p) => s + (p.monto || 0), 0);
 
-  // Deuda real
+  // Deuda real = Deuda guardada - Pagos a deuda
   const getDeudaReal = (cuentaId) => Math.max(0, getDeuda(cuentaId) - getPagosDeuda(cuentaId));
 
-  // Total
+  // Total = Deuda + Saldo Período
   const getTotal = (cuentaId) => getDeudaReal(cuentaId) + getSaldoPeriodo(cuentaId);
 
   // Totales globales
@@ -329,31 +348,32 @@ const MonityApp = () => {
   // DASHBOARD
   const Dashboard = () => (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-4">
-        <button onClick={() => setModal('ingreso')} className={`p-4 rounded-2xl text-left ${darkMode ? 'bg-emerald-900' : 'bg-emerald-50'}`}>
-          <div className={`text-sm ${darkMode ? 'text-emerald-200' : 'text-emerald-700'}`}>Ingresos</div>
-          <div className={`text-2xl font-bold ${darkMode ? 'text-emerald-300' : 'text-emerald-600'}`}>{formatCurrency(totalIngresos)}</div>
-          <div className={`text-xs ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>+ Agregar</div>
+      <div className="grid grid-cols-2 gap-3">
+        <button onClick={() => setModal('ingreso')} className={`p-5 rounded-2xl text-left shadow-lg transition-transform active:scale-95 ${darkMode ? 'bg-gradient-to-br from-emerald-800 to-emerald-900' : 'bg-gradient-to-br from-emerald-50 to-emerald-100'}`}>
+          <div className={`text-xs font-medium uppercase tracking-wide ${darkMode ? 'text-emerald-300' : 'text-emerald-600'}`}>💰 Ingresos</div>
+          <div className={`text-2xl font-bold mt-1 ${darkMode ? 'text-white' : 'text-emerald-700'}`}>{formatCurrency(totalIngresos)}</div>
+          <div className={`text-xs mt-2 ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>+ Agregar</div>
         </button>
-        <button onClick={() => setModal('deudas')} className={`p-4 rounded-2xl text-left ${darkMode ? 'bg-rose-900' : 'bg-rose-50'}`}>
-          <div className={`text-sm ${darkMode ? 'text-rose-200' : 'text-rose-700'}`}>Deuda Vencida</div>
-          <div className={`text-2xl font-bold ${darkMode ? 'text-rose-300' : 'text-rose-600'}`}>{formatCurrency(totalDeuda)}</div>
+        <button onClick={() => setModal('deudas')} className={`p-5 rounded-2xl text-left shadow-lg transition-transform active:scale-95 ${darkMode ? 'bg-gradient-to-br from-rose-800 to-rose-900' : 'bg-gradient-to-br from-rose-50 to-rose-100'}`}>
+          <div className={`text-xs font-medium uppercase tracking-wide ${darkMode ? 'text-rose-300' : 'text-rose-600'}`}>🔴 Deuda Vencida</div>
+          <div className={`text-2xl font-bold mt-1 ${darkMode ? 'text-white' : 'text-rose-700'}`}>{formatCurrency(totalDeuda)}</div>
+          <div className={`text-xs mt-2 ${darkMode ? 'text-rose-400' : 'text-rose-600'}`}>Ver detalle</div>
         </button>
-        <div className={`p-4 rounded-2xl ${darkMode ? 'bg-amber-900' : 'bg-amber-50'}`}>
-          <div className={`text-sm ${darkMode ? 'text-amber-200' : 'text-amber-700'}`}>Consumos Período</div>
-          <div className={`text-2xl font-bold ${darkMode ? 'text-amber-300' : 'text-amber-600'}`}>{formatCurrency(totalConsumos)}</div>
+        <div className={`p-5 rounded-2xl shadow-lg ${darkMode ? 'bg-gradient-to-br from-amber-800 to-amber-900' : 'bg-gradient-to-br from-amber-50 to-amber-100'}`}>
+          <div className={`text-xs font-medium uppercase tracking-wide ${darkMode ? 'text-amber-300' : 'text-amber-600'}`}>🛒 Consumos Período</div>
+          <div className={`text-2xl font-bold mt-1 ${darkMode ? 'text-white' : 'text-amber-700'}`}>{formatCurrency(totalConsumos)}</div>
         </div>
-        <div className={`p-4 rounded-2xl ${darkMode ? 'bg-blue-900' : 'bg-blue-50'}`}>
-          <div className={`text-sm ${darkMode ? 'text-blue-200' : 'text-blue-700'}`}>Disponible</div>
-          <div className={`text-2xl font-bold ${disponible >= 0 ? (darkMode ? 'text-blue-300' : 'text-blue-600') : 'text-rose-500'}`}>{formatCurrency(disponible)}</div>
+        <div className={`p-5 rounded-2xl shadow-lg ${darkMode ? 'bg-gradient-to-br from-blue-800 to-blue-900' : 'bg-gradient-to-br from-blue-50 to-blue-100'}`}>
+          <div className={`text-xs font-medium uppercase tracking-wide ${darkMode ? 'text-blue-300' : 'text-blue-600'}`}>💵 Disponible</div>
+          <div className={`text-2xl font-bold mt-1 ${disponible >= 0 ? (darkMode ? 'text-white' : 'text-blue-700') : 'text-rose-500'}`}>{formatCurrency(disponible)}</div>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <button onClick={() => setModal('consumo')} className="flex items-center justify-center gap-2 p-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl font-medium">
+      <div className="grid grid-cols-2 gap-3">
+        <button onClick={() => setModal('consumo')} className="flex items-center justify-center gap-2 p-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl font-semibold shadow-lg transition-transform active:scale-95">
           <Minus className="w-5 h-5" /> Consumo
         </button>
-        <button onClick={() => setModal('pago')} className="flex items-center justify-center gap-2 p-4 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl font-medium">
+        <button onClick={() => setModal('pago')} className="flex items-center justify-center gap-2 p-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl font-semibold shadow-lg transition-transform active:scale-95">
           <Plus className="w-5 h-5" /> Pago
         </button>
       </div>
@@ -384,36 +404,51 @@ const MonityApp = () => {
           const deuda = getDeudaReal(c.id);
           const periodo = getSaldoPeriodo(c.id);
           const total = deuda + periodo;
+          const sinFechas = !c.cierreAnterior && !c.cierreActual;
           return (
-            <div key={c.id} onClick={() => { setCuentaActiva(c); setTab('detalle'); }} className={`p-4 rounded-2xl border mb-3 cursor-pointer ${theme.border} ${theme.card}`}>
-              <div className="flex items-center justify-between mb-2">
+            <div key={c.id} onClick={() => { setCuentaActiva(c); setTab('detalle'); }} className={`p-4 rounded-2xl border mb-3 cursor-pointer ${theme.border} ${theme.card} hover:shadow-lg transition-shadow`}>
+              <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
-                  <EntidadLogo entidad={c.entidad} size={40} />
+                  <EntidadLogo entidad={c.entidad} size={44} />
                   <div>
                     <div className={`font-semibold ${theme.text}`}>{c.nombre}</div>
                     <div className={`text-xs ${theme.textMuted}`}>{TIPOS_CUENTA.find(t => t.id === c.tipoCuenta)?.nombre}</div>
                   </div>
                 </div>
-                <button onClick={(e) => { e.stopPropagation(); setCuentaEditar(c); setModal('editarCuenta'); }} className="p-2"><Edit3 className="w-4 h-4" /></button>
+                <button onClick={(e) => { e.stopPropagation(); setCuentaEditar(c); setModal('editarCuenta'); }} className={`p-2 rounded-lg ${theme.hover}`}><Edit3 className={`w-4 h-4 ${theme.textMuted}`} /></button>
               </div>
-              <div className={`grid grid-cols-3 gap-2 text-xs p-2 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
-                <div className="text-center">
-                  <div className={theme.textMuted}>Deuda</div>
-                  <div className={`font-bold ${deuda > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(deuda)}</div>
+              {sinFechas ? (
+                // Vista simplificada para cuentas sin fechas
+                <div className={`p-3 rounded-xl text-center ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
+                  <div className={`text-xs ${theme.textMuted} mb-1`}>Saldo Total</div>
+                  <div className={`text-xl font-bold ${total > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(total)}</div>
+                  <div className={`text-xs mt-2 px-2 py-1 rounded-full inline-block ${darkMode ? 'bg-amber-900/50 text-amber-300' : 'bg-amber-100 text-amber-700'}`}>
+                    ⚠️ Configurá fechas de cierre
+                  </div>
                 </div>
-                <div className="text-center">
-                  <div className={theme.textMuted}>Período</div>
-                  <div className={`font-bold ${periodo > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>{formatCurrency(periodo)}</div>
-                </div>
-                <div className="text-center">
-                  <div className={theme.textMuted}>Total</div>
-                  <div className={`font-bold ${total > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(total)}</div>
-                </div>
-              </div>
-              <div className={`flex justify-between text-xs mt-2 ${theme.textMuted}`}>
-                <span>Cierre: {formatDate(c.cierreActual)}</span>
-                <span>Vence: {formatDate(c.vencimientoActual)}</span>
-              </div>
+              ) : (
+                // Vista completa con Deuda | Período | Total
+                <>
+                  <div className={`grid grid-cols-3 gap-2 text-xs p-3 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
+                    <div className="text-center">
+                      <div className={theme.textMuted}>Deuda</div>
+                      <div className={`font-bold ${deuda > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(deuda)}</div>
+                    </div>
+                    <div className="text-center">
+                      <div className={theme.textMuted}>Período</div>
+                      <div className={`font-bold ${periodo > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>{formatCurrency(periodo)}</div>
+                    </div>
+                    <div className="text-center">
+                      <div className={theme.textMuted}>Total</div>
+                      <div className={`font-bold ${total > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(total)}</div>
+                    </div>
+                  </div>
+                  <div className={`flex justify-between text-xs mt-2 ${theme.textMuted}`}>
+                    <span>🗓️ Cierre: {formatDate(c.cierreActual)}</span>
+                    <span>⏰ Vence: {formatDate(c.vencimientoActual)}</span>
+                  </div>
+                </>
+              )}
             </div>
           );
         })}

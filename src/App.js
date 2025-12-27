@@ -219,7 +219,7 @@ const MonityApp = () => {
   const totalIngresos = cuentasIngreso.reduce((s, c) => s + (c.montoMensual || 0), 0);
 
   // Período actual: si hay fechas usa el rango, si no usa todos los movimientos no cerrados
-  const tieneFechas = (cuenta) => cuenta?.cierreAnterior && cuenta?.cierreActual;
+  const tieneFechas = (cuenta) => cuenta?.cierreActual;
   
   const getPeriodo = (cuenta) => ({
     inicio: cuenta?.cierreAnterior || '2000-01-01',
@@ -404,7 +404,7 @@ const MonityApp = () => {
           const deuda = getDeudaReal(c.id);
           const periodo = getSaldoPeriodo(c.id);
           const total = deuda + periodo;
-          const sinFechas = !c.cierreAnterior && !c.cierreActual;
+          const sinFechas = !c.cierreActual; // Solo verificar cierreActual
           return (
             <div key={c.id} onClick={() => { setCuentaActiva(c); setTab('detalle'); }} className={`p-4 rounded-2xl border mb-3 cursor-pointer ${theme.border} ${theme.card} hover:shadow-lg transition-shadow`}>
               <div className="flex items-center justify-between mb-3">
@@ -418,12 +418,12 @@ const MonityApp = () => {
                 <button onClick={(e) => { e.stopPropagation(); setCuentaEditar(c); setModal('editarCuenta'); }} className={`p-2 rounded-lg ${theme.hover}`}><Edit3 className={`w-4 h-4 ${theme.textMuted}`} /></button>
               </div>
               {sinFechas ? (
-                // Vista simplificada para cuentas sin fechas
+                // Vista simplificada para cuentas sin fecha de cierre actual
                 <div className={`p-3 rounded-xl text-center ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
                   <div className={`text-xs ${theme.textMuted} mb-1`}>Saldo Total</div>
                   <div className={`text-xl font-bold ${total > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(total)}</div>
                   <div className={`text-xs mt-2 px-2 py-1 rounded-full inline-block ${darkMode ? 'bg-amber-900/50 text-amber-300' : 'bg-amber-100 text-amber-700'}`}>
-                    ⚠️ Configurá fechas de cierre
+                    ⚠️ Configurá fecha de cierre actual
                   </div>
                 </div>
               ) : (
@@ -633,24 +633,55 @@ const MonityApp = () => {
 
   const ModalEditarCuenta = () => {
     const [nombre, setNombre] = useState(cuentaEditar?.nombre || '');
+    const [cierreAnt, setCierreAnt] = useState(cuentaEditar?.cierreAnterior || '');
+    const [cierreAct, setCierreAct] = useState(cuentaEditar?.cierreActual || '');
     const [cierreProx, setCierreProx] = useState(cuentaEditar?.cierreProximo || '');
+    const [vencAnt, setVencAnt] = useState(cuentaEditar?.vencimientoAnterior || '');
+    const [vencAct, setVencAct] = useState(cuentaEditar?.vencimientoActual || '');
     const [vencProx, setVencProx] = useState(cuentaEditar?.vencimientoProximo || '');
     if (!cuentaEditar) return null;
 
     const guardar = async () => {
-      await actualizarCuenta(cuentaEditar.id, { nombre, cierreProximo: cierreProx, vencimientoProximo: vencProx });
-      if (cuentaActiva?.id === cuentaEditar.id) setCuentaActiva({ ...cuentaActiva, nombre, cierreProximo: cierreProx, vencimientoProximo: vencProx });
+      const datos = { 
+        nombre, 
+        cierreAnterior: cierreAnt, cierreActual: cierreAct, cierreProximo: cierreProx,
+        vencimientoAnterior: vencAnt, vencimientoActual: vencAct, vencimientoProximo: vencProx 
+      };
+      await actualizarCuenta(cuentaEditar.id, datos);
+      if (cuentaActiva?.id === cuentaEditar.id) setCuentaActiva({ ...cuentaActiva, ...datos });
       setModal(null); setCuentaEditar(null);
     };
 
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <div className={`rounded-2xl w-full max-w-lg ${theme.card}`}>
-          <div className={`p-4 border-b flex justify-between ${theme.border}`}><h3 className={`font-bold ${theme.text}`}>Editar Cuenta</h3><button onClick={() => { setModal(null); setCuentaEditar(null); }}><X className={`w-5 h-5 ${theme.text}`} /></button></div>
+        <div className={`rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto ${theme.card}`}>
+          <div className={`p-4 border-b flex justify-between sticky top-0 ${theme.card} ${theme.border}`}>
+            <h3 className={`font-bold ${theme.text}`}>Editar Cuenta</h3>
+            <button onClick={() => { setModal(null); setCuentaEditar(null); }}><X className={`w-5 h-5 ${theme.text}`} /></button>
+          </div>
           <div className="p-4 space-y-4">
-            <div><label className={`text-sm ${theme.textMuted}`}>Nombre</label><input type="text" value={nombre} onChange={e => setNombre(e.target.value)} className={`w-full p-3 border rounded-xl ${theme.input}`} /></div>
-            <DateInput label="Próximo Cierre" value={cierreProx} onChange={setCierreProx} theme={theme} />
-            <DateInput label="Próximo Vencimiento" value={vencProx} onChange={setVencProx} theme={theme} />
+            <div>
+              <label className={`text-sm ${theme.textMuted}`}>Nombre</label>
+              <input type="text" value={nombre} onChange={e => setNombre(e.target.value)} className={`w-full p-3 border rounded-xl ${theme.input}`} />
+            </div>
+            
+            <div className={`p-3 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
+              <h4 className={`text-sm font-semibold mb-2 ${theme.text}`}>📅 Fechas de Cierre</h4>
+              <div className="grid grid-cols-3 gap-2">
+                <DateInput label="Anterior" value={cierreAnt} onChange={setCierreAnt} theme={theme} />
+                <DateInput label="Actual ⭐" value={cierreAct} onChange={setCierreAct} theme={theme} />
+                <DateInput label="Próximo" value={cierreProx} onChange={setCierreProx} theme={theme} />
+              </div>
+            </div>
+            
+            <div className={`p-3 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
+              <h4 className={`text-sm font-semibold mb-2 ${theme.text}`}>⏰ Fechas de Vencimiento</h4>
+              <div className="grid grid-cols-3 gap-2">
+                <DateInput label="Anterior" value={vencAnt} onChange={setVencAnt} theme={theme} />
+                <DateInput label="Actual ⭐" value={vencAct} onChange={setVencAct} theme={theme} />
+                <DateInput label="Próximo" value={vencProx} onChange={setVencProx} theme={theme} />
+              </div>
+            </div>
           </div>
           <div className={`p-4 border-t flex gap-3 ${theme.border}`}>
             <button onClick={() => { setModal(null); setCuentaEditar(null); }} className={`flex-1 p-3 border rounded-xl ${theme.border} ${theme.text}`}>Cancelar</button>
@@ -979,8 +1010,9 @@ const MonityApp = () => {
 
   return (
     <div className={`min-h-screen ${theme.bg}`}>
+      {/* Header */}
       <div className={`sticky top-0 z-40 ${theme.card} border-b ${theme.border}`}>
-        <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-md mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2"><MonityLogo size={32} /><span className={`font-bold text-lg ${theme.text}`}>Monity</span></div>
           <div className="flex items-center gap-2">
             <button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded-xl ${theme.hover}`}>{darkMode ? <Sun className="w-5 h-5 text-yellow-400" /> : <Moon className="w-5 h-5" />}</button>
@@ -988,19 +1020,22 @@ const MonityApp = () => {
           </div>
         </div>
       </div>
-      <div className="max-w-lg mx-auto px-4 py-6 pb-24">
+      {/* Content */}
+      <div className="max-w-md mx-auto px-4 py-4 pb-24">
         {tab === 'dashboard' && <Dashboard />}
         {tab === 'detalle' && <DetalleCuenta />}
         {tab === 'stats' && <div className={`text-center py-12 ${theme.textMuted}`}><BarChart3 className="w-16 h-16 mx-auto mb-4 opacity-50" /><p>Próximamente</p></div>}
         {tab === 'config' && <div className="space-y-4"><h2 className={`text-lg font-bold ${theme.text}`}>Configuración</h2><div className={`p-4 rounded-xl ${theme.card} border ${theme.border}`}><p className={`text-sm ${theme.textMuted}`}>Usuario: {user?.email}</p></div></div>}
       </div>
+      {/* Bottom Nav */}
       <div className={`fixed bottom-0 left-0 right-0 ${theme.card} border-t ${theme.border}`}>
-        <div className="max-w-lg mx-auto flex">
+        <div className="max-w-md mx-auto flex">
           {tabs.map(t => (
             <button key={t.id} onClick={() => { setTab(t.id); if(t.id === 'dashboard') setCuentaActiva(null); }} className={`flex-1 py-3 flex flex-col items-center gap-1 ${tab === t.id ? 'text-indigo-500' : theme.textMuted}`}>{t.icon}<span className="text-xs">{t.label}</span></button>
           ))}
         </div>
       </div>
+      {/* Modals */}
       {modal === 'ingreso' && <ModalIngreso />}
       {modal === 'cuenta' && <ModalCuenta />}
       {modal === 'editarCuenta' && <ModalEditarCuenta />}

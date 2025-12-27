@@ -1,177 +1,36 @@
 <!DOCTYPE html>
 <html lang="es">
-  <head>
-    <meta charset="utf-8" />
-    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-    <meta name="theme-color" content="#6366f1" />
-    <meta name="description" content="Monity - Tu asistente de finanzas personales" />
-    
-    <!-- PWA Meta Tags -->
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Monity">
-    
-    <!-- Icons -->
-    <link rel="apple-touch-icon" href="%PUBLIC_URL%/icon-192.png" />
-    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
-    
-    <!-- Splash screens iOS -->
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    
-    <title>Monity - Control Financiero</title>
-    
-    <style>
-      * { margin: 0; padding: 0; box-sizing: border-box; }
-      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-      #root { min-height: 100vh; }
-      
-      /* PWA Install Banner */
-      .pwa-install-banner {
-        position: fixed;
-        bottom: 80px;
-        left: 16px;
-        right: 16px;
-        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-        color: white;
-        padding: 16px;
-        border-radius: 16px;
-        box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);
-        z-index: 1000;
-        display: none;
-        animation: slideUp 0.3s ease;
-      }
-      
-      @keyframes slideUp {
-        from { transform: translateY(100px); opacity: 0; }
-        to { transform: translateY(0); opacity: 1; }
-      }
-      
-      .pwa-install-banner.show { display: block; }
-      
-      .pwa-install-content {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-      }
-      
-      .pwa-install-icon {
-        width: 48px;
-        height: 48px;
-        background: white;
-        border-radius: 12px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 24px;
-      }
-      
-      .pwa-install-text h4 { font-size: 16px; margin-bottom: 4px; }
-      .pwa-install-text p { font-size: 13px; opacity: 0.9; }
-      
-      .pwa-install-actions {
-        display: flex;
-        gap: 8px;
-        margin-top: 12px;
-      }
-      
-      .pwa-install-btn {
-        flex: 1;
-        padding: 10px;
-        border: none;
-        border-radius: 8px;
-        font-weight: 600;
-        cursor: pointer;
-      }
-      
-      .pwa-install-btn.primary {
-        background: white;
-        color: #6366f1;
-      }
-      
-      .pwa-install-btn.secondary {
-        background: rgba(255,255,255,0.2);
-        color: white;
-      }
-    </style>
-  </head>
-  <body>
-    <noscript>Necesitás JavaScript para usar Monity.</noscript>
-    <div id="root"></div>
-    
-    <!-- PWA Install Banner -->
-    <div id="pwa-install-banner" class="pwa-install-banner">
-      <div class="pwa-install-content">
-        <div class="pwa-install-icon">💰</div>
-        <div class="pwa-install-text">
-          <h4>Instalar Monity</h4>
-          <p>Agregá la app a tu pantalla de inicio</p>
-        </div>
-      </div>
-      <div class="pwa-install-actions">
-        <button class="pwa-install-btn secondary" onclick="dismissInstall()">Ahora no</button>
-        <button class="pwa-install-btn primary" onclick="installPWA()">Instalar</button>
-      </div>
-    </div>
-    
-    <script>
-      // Register Service Worker
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then((registration) => {
-              console.log('SW registered:', registration);
-            })
-            .catch((error) => {
-              console.log('SW registration failed:', error);
-            });
-        });
-      }
-      
-      // PWA Install prompt
-      let deferredPrompt;
-      
-      window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        deferredPrompt = e;
-        
-        // Show install banner after 3 seconds
-        setTimeout(() => {
-          const banner = document.getElementById('pwa-install-banner');
-          if (banner && !localStorage.getItem('pwa-install-dismissed')) {
-            banner.classList.add('show');
-          }
-        }, 3000);
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  
+  <!-- PWA -->
+  <meta name="theme-color" content="#6366f1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Monity">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+  
+  <title>Monity</title>
+</head>
+<body>
+  <div id="root"></div>
+  <script>
+    // Limpiar Service Workers y Cache
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(regs => {
+        regs.forEach(r => r.unregister());
       });
-      
-      function installPWA() {
-        const banner = document.getElementById('pwa-install-banner');
-        banner.classList.remove('show');
-        
-        if (deferredPrompt) {
-          deferredPrompt.prompt();
-          deferredPrompt.userChoice.then((choiceResult) => {
-            if (choiceResult.outcome === 'accepted') {
-              console.log('User accepted install');
-            }
-            deferredPrompt = null;
-          });
-        }
-      }
-      
-      function dismissInstall() {
-        const banner = document.getElementById('pwa-install-banner');
-        banner.classList.remove('show');
-        localStorage.setItem('pwa-install-dismissed', 'true');
-      }
-      
-      // Check if running as PWA
-      window.addEventListener('appinstalled', () => {
-        console.log('Monity installed');
-        const banner = document.getElementById('pwa-install-banner');
-        if (banner) banner.classList.remove('show');
+    }
+    if ('caches' in window) {
+      caches.keys().then(names => {
+        names.forEach(name => caches.delete(name));
       });
-    </script>
-  </body>
+    }
+  </script>
+</body>
 </html>

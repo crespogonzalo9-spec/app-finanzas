@@ -1,3 +1,4 @@
+// src/index.js
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
@@ -9,6 +10,3 @@ root.render(
     <App />
   </React.StrictMode>
 );
-
-// Se eliminó la limpieza agresiva de Service Workers y Cache que causaba problemas con el Login.
-// La gestión de caché ahora es manejada por el control de versiones en App.js

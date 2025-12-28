@@ -17,13 +17,17 @@ const Dashboard = ({ setModal, setCuentaEditar, setCuentaActiva, setTab, setCuot
     totalDeuda, 
     totalConsumos, 
     disponible,
-    getDeudaReal,
-    getSaldoPeriodo,
-    getTotal
+    getResumenCuenta
   } = useCalculations();
 
   const cuotasActivas = cuotas.filter(c => c.estado === 'activa');
   const debitosActivos = (debitos || []).filter(d => d.activo !== false);
+
+  // Calcular total real a pagar (para mostrar en resumen)
+  const totalAPagar = cuentasContables.reduce((s, c) => {
+    const { total } = getResumenCuenta(c.id);
+    return s + total;
+  }, 0);
 
   return (
     <div className="space-y-6">
@@ -36,13 +40,13 @@ const Dashboard = ({ setModal, setCuentaEditar, setCuentaActiva, setTab, setCuot
         </button>
         
         <button onClick={() => setModal('deudas')} className={`p-5 rounded-2xl text-left shadow-lg transition-transform active:scale-95 ${darkMode ? 'bg-gradient-to-br from-rose-800 to-rose-900' : 'bg-gradient-to-br from-rose-50 to-rose-100'}`}>
-          <div className={`text-sm font-medium uppercase tracking-wide ${darkMode ? 'text-rose-300' : 'text-rose-600'}`}>🔴 Deuda</div>
-          <div className={`text-2xl font-bold mt-2 ${darkMode ? 'text-white' : 'text-rose-700'}`}>{formatCurrency(totalDeuda)}</div>
+          <div className={`text-sm font-medium uppercase tracking-wide ${darkMode ? 'text-rose-300' : 'text-rose-600'}`}>🔴 Total a Pagar</div>
+          <div className={`text-2xl font-bold mt-2 ${darkMode ? 'text-white' : 'text-rose-700'}`}>{formatCurrency(totalAPagar)}</div>
           <div className={`text-sm mt-2 ${darkMode ? 'text-rose-400' : 'text-rose-600'}`}>Ver detalle</div>
         </button>
         
         <div className={`p-5 rounded-2xl shadow-lg ${darkMode ? 'bg-gradient-to-br from-amber-800 to-amber-900' : 'bg-gradient-to-br from-amber-50 to-amber-100'}`}>
-          <div className={`text-sm font-medium uppercase tracking-wide ${darkMode ? 'text-amber-300' : 'text-amber-600'}`}>🛒 Consumos</div>
+          <div className={`text-sm font-medium uppercase tracking-wide ${darkMode ? 'text-amber-300' : 'text-amber-600'}`}>🛒 Consumos Período</div>
           <div className={`text-2xl font-bold mt-2 ${darkMode ? 'text-white' : 'text-amber-700'}`}>{formatCurrency(totalConsumos)}</div>
         </div>
         
@@ -128,9 +132,7 @@ const Dashboard = ({ setModal, setCuentaEditar, setCuentaActiva, setTab, setCuot
         {/* Grid de cuentas - responsive */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {cuentasContables.map(c => {
-            const deuda = getDeudaReal(c.id);
-            const periodo = getSaldoPeriodo(c.id);
-            const total = getTotal(c.id);
+            const { deudaNeta, saldoPeriodo, total, tieneSaldoAFavor } = getResumenCuenta(c.id);
             const sinFechas = !c.cierreActual;
             
             return (
@@ -165,15 +167,28 @@ const Dashboard = ({ setModal, setCuentaEditar, setCuentaActiva, setTab, setCuot
                     <div className={`grid grid-cols-3 gap-3 p-4 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
                       <div className="text-center">
                         <div className={`text-sm ${theme.textMuted}`}>Deuda</div>
-                        <div className={`text-lg font-bold ${deuda > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(deuda)}</div>
+                        <div className={`text-lg font-bold ${deudaNeta > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                          {formatCurrency(deudaNeta)}
+                        </div>
                       </div>
                       <div className="text-center">
                         <div className={`text-sm ${theme.textMuted}`}>Período</div>
-                        <div className={`text-lg font-bold ${periodo > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>{formatCurrency(periodo)}</div>
+                        <div className={`text-lg font-bold ${
+                          saldoPeriodo > 0 ? 'text-amber-500' : 
+                          saldoPeriodo < 0 ? 'text-emerald-500' : 
+                          'text-emerald-500'
+                        }`}>
+                          {tieneSaldoAFavor && '-'}{formatCurrency(Math.abs(saldoPeriodo))}
+                        </div>
+                        {tieneSaldoAFavor && (
+                          <div className="text-xs text-emerald-400">A favor</div>
+                        )}
                       </div>
                       <div className="text-center">
                         <div className={`text-sm ${theme.textMuted}`}>Total</div>
-                        <div className={`text-lg font-bold ${total > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(total)}</div>
+                        <div className={`text-lg font-bold ${total > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                          {formatCurrency(total)}
+                        </div>
                       </div>
                     </div>
                     <div className={`flex justify-between text-sm mt-3 ${theme.textMuted}`}>

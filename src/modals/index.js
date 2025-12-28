@@ -226,34 +226,47 @@ export const ModalEditarDebito = ({ debito, onClose }) => {
 export const ModalPago = ({ onClose }) => {
   const { darkMode, theme } = useTheme();
   const { guardarPago, actualizarMovimiento } = useData();
-  const { cuentasContables, getDeudaReal, getSaldoPeriodo, getTotalSaldosPendientes, getSaldosPendientes } = useCalculations();
+  const { cuentasContables, getDeudaReal, getSaldoPeriodo, getSaldosPendientes } = useCalculations();
   const [cuentaId, setCuentaId] = useState('');
   const [monto, setMonto] = useState('');
   const [fecha, setFecha] = useState(today());
   const [tipoPago, setTipoPago] = useState('periodo');
+  
+  // Deuda = Saldos pendientes
   const deuda = cuentaId ? getDeudaReal(cuentaId) : 0;
   const saldo = cuentaId ? getSaldoPeriodo(cuentaId) : 0;
-  const totalSaldosPend = cuentaId ? getTotalSaldosPendientes(cuentaId) : 0;
-  const aplicarPagoASaldoPendiente = async (montoPago) => {
+  
+  // Aplicar pago a deuda (saldos pendientes)
+  const aplicarPagoADeuda = async (montoPago) => {
     const saldosPend = getSaldosPendientes(cuentaId).sort((a, b) => new Date(a.periodoOrigen || a.fecha) - new Date(b.periodoOrigen || b.fecha));
     let restante = montoPago;
     for (const sp of saldosPend) {
       if (restante <= 0) break;
-      if (restante >= sp.monto) { restante -= sp.monto; await actualizarMovimiento(sp.id, { monto: 0, periodoCerrado: true }); }
-      else { await actualizarMovimiento(sp.id, { monto: sp.monto - restante }); restante = 0; }
+      if (restante >= sp.monto) { 
+        restante -= sp.monto; 
+        await actualizarMovimiento(sp.id, { monto: 0, periodoCerrado: true }); 
+      } else { 
+        await actualizarMovimiento(sp.id, { monto: sp.monto - restante }); 
+        restante = 0; 
+      }
     }
   };
+  
   const guardar = async () => {
     if (!cuentaId || !monto) return;
     const montoNum = parseFloat(monto);
-    if (tipoPago === 'saldo_pendiente' && totalSaldosPend > 0) {
-      await guardarPago({ cuentaId, descripcion: 'Pago saldo pendiente', monto: montoNum, fecha, esParaDeuda: false });
-      await aplicarPagoASaldoPendiente(montoNum);
+    
+    if (tipoPago === 'deuda' && deuda > 0) {
+      // Pago a deuda = descuenta de saldos pendientes
+      await guardarPago({ cuentaId, descripcion: 'Pago deuda', monto: montoNum, fecha, esParaDeuda: true });
+      await aplicarPagoADeuda(montoNum);
     } else {
-      await guardarPago({ cuentaId, descripcion: tipoPago === 'deuda' ? 'Pago deuda' : 'Pago período', monto: montoNum, fecha, esParaDeuda: tipoPago === 'deuda' });
+      // Pago del período
+      await guardarPago({ cuentaId, descripcion: 'Pago período', monto: montoNum, fecha, esParaDeuda: false });
     }
     onClose();
   };
+  
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div className={`rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto ${theme.card}`} onClick={e => e.stopPropagation()}>
@@ -266,13 +279,17 @@ export const ModalPago = ({ onClose }) => {
                 <div><div className={`text-base ${theme.textMuted}`}>Período</div><div className={`text-2xl font-bold ${saldo > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>{formatCurrency(saldo)}</div></div>
                 <div><div className={`text-base ${theme.textMuted}`}>Deuda</div><div className={`text-2xl font-bold ${deuda > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(deuda)}</div></div>
               </div>
-              {totalSaldosPend > 0 && <div className="mt-4 pt-4 border-t border-gray-600 text-center"><div className={`text-base ${theme.textMuted}`}>⚠️ Saldos Pendientes</div><div className="text-2xl font-bold text-orange-500">{formatCurrency(totalSaldosPend)}</div></div>}
             </div>
             <div className={`p-4 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
               <p className={`font-semibold mb-3 text-lg ${theme.text}`}>Tipo de pago</p>
-              <label className={`flex items-center gap-4 p-3 rounded-xl cursor-pointer ${tipoPago === 'periodo' ? (darkMode ? 'bg-blue-900' : 'bg-blue-100') : ''}`}><input type="radio" checked={tipoPago === 'periodo'} onChange={() => setTipoPago('periodo')} className="w-5 h-5" /><span className={`text-lg ${theme.text}`}>Pago del período</span></label>
-              {totalSaldosPend > 0 && <label className={`flex items-center gap-4 p-3 rounded-xl cursor-pointer mt-2 ${tipoPago === 'saldo_pendiente' ? (darkMode ? 'bg-orange-900' : 'bg-orange-100') : ''}`}><input type="radio" checked={tipoPago === 'saldo_pendiente'} onChange={() => setTipoPago('saldo_pendiente')} className="w-5 h-5" /><span className={`text-lg ${theme.text}`}>⚠️ Pago saldo pendiente</span></label>}
-              <label className={`flex items-center gap-4 p-3 rounded-xl cursor-pointer mt-2 ${tipoPago === 'deuda' ? (darkMode ? 'bg-rose-900' : 'bg-rose-100') : ''} ${deuda <= 0 ? 'opacity-50' : ''}`}><input type="radio" checked={tipoPago === 'deuda'} onChange={() => setTipoPago('deuda')} disabled={deuda <= 0} className="w-5 h-5" /><span className={`text-lg ${theme.text}`}>Pago de deuda</span></label>
+              <label className={`flex items-center gap-4 p-3 rounded-xl cursor-pointer ${tipoPago === 'periodo' ? (darkMode ? 'bg-blue-900' : 'bg-blue-100') : ''}`}>
+                <input type="radio" checked={tipoPago === 'periodo'} onChange={() => setTipoPago('periodo')} className="w-5 h-5" />
+                <span className={`text-lg ${theme.text}`}>💳 Pago del período ({formatCurrency(saldo)})</span>
+              </label>
+              <label className={`flex items-center gap-4 p-3 rounded-xl cursor-pointer mt-2 ${tipoPago === 'deuda' ? (darkMode ? 'bg-rose-900' : 'bg-rose-100') : ''} ${deuda <= 0 ? 'opacity-50' : ''}`}>
+                <input type="radio" checked={tipoPago === 'deuda'} onChange={() => setTipoPago('deuda')} disabled={deuda <= 0} className="w-5 h-5" />
+                <span className={`text-lg ${theme.text}`}>🔴 Pago de deuda ({formatCurrency(deuda)})</span>
+              </label>
             </div>
           </>)}
           <input type="number" value={monto} onChange={e => setMonto(e.target.value)} placeholder="Monto" className={`w-full p-4 border rounded-xl text-lg ${theme.input}`} />

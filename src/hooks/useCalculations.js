@@ -23,44 +23,24 @@ export const useCalculations = () => {
     fin: cuenta?.cierreActual || '2099-12-31'
   });
 
-  // Consumos del período
+  // Consumos del período - INCLUYE cuotas y saldos pendientes
   const getConsumosPeriodo = (cuentaId) => {
-    const cuenta = cuentas.find(c => c.id === cuentaId);
-    if (!cuenta) return 0;
-    
-    if (tieneFechas(cuenta)) {
-      const p = getPeriodo(cuenta);
-      return movimientos
-        .filter(m => m.cuentaId === cuentaId && !m.periodoCerrado && m.fecha >= p.inicio && m.fecha <= p.fin)
-        .reduce((s, m) => s + (m.monto || 0), 0);
-    } else {
-      return movimientos
-        .filter(m => m.cuentaId === cuentaId && !m.periodoCerrado)
-        .reduce((s, m) => s + (m.monto || 0), 0);
-    }
+    return movimientos
+      .filter(m => m.cuentaId === cuentaId && !m.periodoCerrado)
+      .reduce((s, m) => s + (m.monto || 0), 0);
   };
 
   // Pagos del período (no de deuda)
   const getPagosPeriodo = (cuentaId) => {
-    const cuenta = cuentas.find(c => c.id === cuentaId);
-    if (!cuenta) return 0;
-    
-    if (tieneFechas(cuenta)) {
-      const p = getPeriodo(cuenta);
-      return pagos
-        .filter(pg => pg.cuentaId === cuentaId && !pg.esParaDeuda && pg.fecha >= p.inicio && pg.fecha <= p.fin)
-        .reduce((s, pg) => s + (pg.monto || 0), 0);
-    } else {
-      return pagos
-        .filter(pg => pg.cuentaId === cuentaId && !pg.esParaDeuda)
-        .reduce((s, pg) => s + (pg.monto || 0), 0);
-    }
+    return pagos
+      .filter(pg => pg.cuentaId === cuentaId && !pg.esParaDeuda)
+      .reduce((s, pg) => s + (pg.monto || 0), 0);
   };
 
   // Saldo del período
   const getSaldoPeriodo = (cuentaId) => getConsumosPeriodo(cuentaId) - getPagosPeriodo(cuentaId);
 
-  // Deuda acumulada
+  // Deuda acumulada (legacy - para compatibilidad)
   const getDeuda = (cuentaId) => {
     const cuenta = cuentas.find(c => c.id === cuentaId);
     return cuenta?.deudaAcumulada || 0;
@@ -76,9 +56,16 @@ export const useCalculations = () => {
   // Total
   const getTotal = (cuentaId) => getDeudaReal(cuentaId) + getSaldoPeriodo(cuentaId);
 
+  // Saldos pendientes de períodos anteriores
+  const getSaldosPendientes = (cuentaId) => 
+    movimientos.filter(m => m.cuentaId === cuentaId && m.esSaldoPendiente && !m.periodoCerrado && m.monto > 0);
+
+  const getTotalSaldosPendientes = (cuentaId) => 
+    getSaldosPendientes(cuentaId).reduce((s, m) => s + m.monto, 0);
+
   // Totales globales
   const totalDeuda = useMemo(() => 
-    cuentasContables.reduce((s, c) => s + getDeudaReal(c.id), 0), [cuentasContables, pagos]);
+    cuentasContables.reduce((s, c) => s + getDeudaReal(c.id), 0), [cuentasContables, pagos, cuentas]);
   
   const totalConsumos = useMemo(() => 
     cuentasContables.reduce((s, c) => s + Math.max(0, getSaldoPeriodo(c.id)), 0), [cuentasContables, movimientos, pagos]);
@@ -100,6 +87,8 @@ export const useCalculations = () => {
     getSaldoPeriodo,
     getDeuda,
     getDeudaReal,
-    getTotal
+    getTotal,
+    getSaldosPendientes,
+    getTotalSaldosPendientes
   };
 };

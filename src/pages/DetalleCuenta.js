@@ -11,20 +11,18 @@ import { formatCurrency, formatDate } from '../utils/helpers';
 const DetalleCuenta = ({ cuenta, onBack, setModal, setCuentaEditar, setMovEditar, setPagoEditar, setModalCierre }) => {
   const { darkMode, theme } = useTheme();
   const { cuentas, movimientos, pagos, eliminarCuenta, eliminarMovimiento, eliminarPago } = useData();
-  const { getDeudaReal, getConsumosPeriodo, getPagosPeriodo, getSaldoPeriodo, getPeriodo } = useCalculations();
+  const { getDeudaReal, getSaldoPeriodo } = useCalculations();
 
   // Obtener cuenta actualizada
   const c = cuentas.find(cu => cu.id === cuenta.id) || cuenta;
   
   const deuda = getDeudaReal(c.id);
-  const consumos = getConsumosPeriodo(c.id);
-  const pagosPer = getPagosPeriodo(c.id);
-  const saldo = consumos - pagosPer;
+  const saldo = getSaldoPeriodo(c.id);
   const total = deuda + saldo;
 
-  const periodo = getPeriodo(c);
-  const movsPeriodo = movimientos.filter(m => m.cuentaId === c.id && m.fecha >= periodo.inicio && m.fecha <= periodo.fin && !m.periodoCerrado);
-  const pagosPeriodo = pagos.filter(p => p.cuentaId === c.id && p.fecha >= periodo.inicio && p.fecha <= periodo.fin);
+  // TODOS los movimientos no cerrados (incluye cuotas y saldos pendientes)
+  const movsPeriodo = movimientos.filter(m => m.cuentaId === c.id && !m.periodoCerrado);
+  const pagosPeriodo = pagos.filter(p => p.cuentaId === c.id && !p.esParaDeuda);
 
   const todos = [
     ...movsPeriodo.map(m => ({ ...m, tipo: 'consumo' })),
@@ -38,23 +36,31 @@ const DetalleCuenta = ({ cuenta, onBack, setModal, setCuentaEditar, setMovEditar
     }
   };
 
+  // Determinar icono según tipo de movimiento
+  const getIcon = (m) => {
+    if (m.tipo === 'pago') return '💰';
+    if (m.esSaldoPendiente) return '⚠️';
+    if (m.esCuota) return '🔄';
+    return CATEGORIAS.find(cat => cat.id === m.categoria)?.icon || '📦';
+  };
+
   return (
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center gap-3">
         <button onClick={onBack} className={`p-2 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
-          <ChevronRight className={`w-5 h-5 rotate-180 ${theme.text}`} />
+          <ChevronRight className={`w-6 h-6 rotate-180 ${theme.text}`} />
         </button>
-        <EntidadLogo entidad={c.entidad} size={44} />
+        <EntidadLogo entidad={c.entidad} size={48} />
         <div className="flex-1">
           <h2 className={`text-lg font-bold ${theme.text}`}>{c.nombre}</h2>
           <p className={`text-sm ${theme.textMuted}`}>{TIPOS_CUENTA.find(t => t.id === c.tipoCuenta)?.nombre}</p>
         </div>
         <button onClick={() => { setCuentaEditar(c); setModal('editarCuenta'); }} className="p-2 text-blue-500">
-          <Edit3 className="w-5 h-5" />
+          <Edit3 className="w-6 h-6" />
         </button>
         <button onClick={handleDelete} className="p-2 text-red-500">
-          <Trash2 className="w-5 h-5" />
+          <Trash2 className="w-6 h-6" />
         </button>
       </div>
 
@@ -62,65 +68,63 @@ const DetalleCuenta = ({ cuenta, onBack, setModal, setCuentaEditar, setMovEditar
       <div className={`rounded-xl p-4 ${darkMode ? 'bg-gray-800' : 'bg-slate-100'}`}>
         <div className="grid grid-cols-3 gap-3 text-center mb-3">
           <div>
-            <div className={`text-xs ${theme.textMuted}`}>Deuda</div>
+            <div className={`text-sm ${theme.textMuted}`}>Deuda</div>
             <div className={`text-lg font-bold ${deuda > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(deuda)}</div>
           </div>
           <div>
-            <div className={`text-xs ${theme.textMuted}`}>Período</div>
+            <div className={`text-sm ${theme.textMuted}`}>Período</div>
             <div className={`text-lg font-bold ${saldo > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>{formatCurrency(saldo)}</div>
           </div>
           <div>
-            <div className={`text-xs ${theme.textMuted}`}>Total</div>
+            <div className={`text-sm ${theme.textMuted}`}>Total</div>
             <div className={`text-lg font-bold ${total > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(total)}</div>
           </div>
         </div>
-        <button onClick={() => setModalCierre({ cuenta: c })} className="w-full py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium">
+        <button onClick={() => setModalCierre({ cuenta: c })} className="w-full py-3 bg-indigo-600 text-white rounded-lg text-base font-medium">
           Cerrar Período
         </button>
       </div>
 
       {/* Fechas */}
       <div className={`rounded-xl p-4 ${darkMode ? 'bg-gray-800' : 'bg-slate-100'}`}>
-        <h4 className={`font-semibold mb-3 ${theme.text}`}>Fechas</h4>
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <div><div className={theme.textMuted}>Cierre Anterior</div><div className={theme.text}>{formatDate(c.cierreAnterior)}</div></div>
-          <div><div className={theme.textMuted}>Venc. Anterior</div><div className={theme.text}>{formatDate(c.vencimientoAnterior)}</div></div>
-          <div><div className={theme.textMuted}>Cierre Actual</div><div className={`font-bold ${theme.text}`}>{formatDate(c.cierreActual)}</div></div>
-          <div><div className={theme.textMuted}>Venc. Actual</div><div className={`font-bold ${theme.text}`}>{formatDate(c.vencimientoActual)}</div></div>
-          <div><div className={theme.textMuted}>Cierre Próximo</div><div className={theme.text}>{formatDate(c.cierreProximo)}</div></div>
-          <div><div className={theme.textMuted}>Venc. Próximo</div><div className={theme.text}>{formatDate(c.vencimientoProximo)}</div></div>
+        <h4 className={`font-semibold mb-3 text-base ${theme.text}`}>Fechas</h4>
+        <div className="grid grid-cols-2 gap-3">
+          <div><div className={`text-sm ${theme.textMuted}`}>Cierre Anterior</div><div className={`text-base ${theme.text}`}>{formatDate(c.cierreAnterior)}</div></div>
+          <div><div className={`text-sm ${theme.textMuted}`}>Venc. Anterior</div><div className={`text-base ${theme.text}`}>{formatDate(c.vencimientoAnterior)}</div></div>
+          <div><div className={`text-sm ${theme.textMuted}`}>Cierre Actual</div><div className={`font-bold text-base ${theme.text}`}>{formatDate(c.cierreActual)}</div></div>
+          <div><div className={`text-sm ${theme.textMuted}`}>Venc. Actual</div><div className={`font-bold text-base ${theme.text}`}>{formatDate(c.vencimientoActual)}</div></div>
+          <div><div className={`text-sm ${theme.textMuted}`}>Cierre Próximo</div><div className={`text-base ${theme.text}`}>{formatDate(c.cierreProximo)}</div></div>
+          <div><div className={`text-sm ${theme.textMuted}`}>Venc. Próximo</div><div className={`text-base ${theme.text}`}>{formatDate(c.vencimientoProximo)}</div></div>
         </div>
       </div>
 
       {/* Movimientos */}
       <div>
-        <h4 className={`font-semibold mb-2 ${theme.text}`}>Movimientos del Período</h4>
+        <h4 className={`font-semibold mb-2 text-base ${theme.text}`}>Movimientos del Período</h4>
         {todos.length === 0 ? (
-          <p className={`text-center py-4 ${theme.textMuted}`}>Sin movimientos</p>
+          <p className={`text-center py-4 text-base ${theme.textMuted}`}>Sin movimientos</p>
         ) : (
           <div className={`border rounded-xl divide-y ${theme.card} ${theme.border}`}>
             {todos.map((m, i) => (
               <div key={m.id + i} className="p-3 flex items-center gap-3">
-                <span className="text-lg">
-                  {m.tipo === 'pago' ? '💰' : m.esCuota ? '🔄' : CATEGORIAS.find(cat => cat.id === m.categoria)?.icon || '📦'}
-                </span>
+                <span className="text-xl">{getIcon(m)}</span>
                 <div className="flex-1 min-w-0">
-                  <p className={`font-medium text-sm truncate ${theme.text}`}>{m.descripcion}</p>
-                  <p className={`text-xs ${theme.textMuted}`}>{formatDate(m.fecha)}</p>
+                  <p className={`font-medium text-base truncate ${theme.text}`}>{m.descripcion}</p>
+                  <p className={`text-sm ${theme.textMuted}`}>{formatDate(m.fecha)}</p>
                 </div>
-                <p className={`font-semibold ${m.tipo === 'pago' ? 'text-emerald-500' : 'text-rose-500'}`}>
+                <p className={`font-semibold text-base ${m.tipo === 'pago' ? 'text-emerald-500' : m.esSaldoPendiente ? 'text-orange-500' : 'text-rose-500'}`}>
                   {m.tipo === 'pago' ? '+' : '-'}{formatCurrency(m.monto)}
                 </p>
-                {m.tipo === 'consumo' && (
+                {m.tipo === 'consumo' && !m.esSaldoPendiente && (
                   <>
-                    <button onClick={() => { setMovEditar(m); setModal('editarMov'); }} className="p-1 text-blue-500"><Edit3 className="w-3 h-3" /></button>
-                    <button onClick={() => { if(window.confirm('¿Eliminar?')) eliminarMovimiento(m.id); }} className="p-1 text-red-500"><Trash2 className="w-3 h-3" /></button>
+                    <button onClick={() => { setMovEditar(m); setModal('editarMov'); }} className="p-1 text-blue-500"><Edit3 className="w-4 h-4" /></button>
+                    <button onClick={() => { if(window.confirm('¿Eliminar?')) eliminarMovimiento(m.id); }} className="p-1 text-red-500"><Trash2 className="w-4 h-4" /></button>
                   </>
                 )}
                 {m.tipo === 'pago' && (
                   <>
-                    <button onClick={() => { setPagoEditar(m); setModal('editarPago'); }} className="p-1 text-blue-500"><Edit3 className="w-3 h-3" /></button>
-                    <button onClick={() => { if(window.confirm('¿Eliminar?')) eliminarPago(m.id); }} className="p-1 text-red-500"><Trash2 className="w-3 h-3" /></button>
+                    <button onClick={() => { setPagoEditar(m); setModal('editarPago'); }} className="p-1 text-blue-500"><Edit3 className="w-4 h-4" /></button>
+                    <button onClick={() => { if(window.confirm('¿Eliminar?')) eliminarPago(m.id); }} className="p-1 text-red-500"><Trash2 className="w-4 h-4" /></button>
                   </>
                 )}
               </div>

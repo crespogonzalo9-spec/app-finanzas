@@ -31,6 +31,7 @@ export const CATEGORIAS = [
   { id: 'entretenimiento', nombre: 'Entretenimiento', icon: '🎬' },
   { id: 'salud', nombre: 'Salud', icon: '🏥' },
   { id: 'cuota', nombre: 'Cuota', icon: '🔄' },
+  { id: 'debito_auto', nombre: 'Débito Automático', icon: '⚡' },
   { id: 'saldo_pendiente', nombre: 'Saldo Pendiente', icon: '⚠️' },
   { id: 'otros', nombre: 'Otros', icon: '📦' },
 ];

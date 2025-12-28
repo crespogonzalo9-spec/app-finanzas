@@ -14,6 +14,7 @@ export const DataProvider = ({ children }) => {
   const [movimientos, setMovimientos] = useState([]);
   const [pagos, setPagos] = useState([]);
   const [cuotas, setCuotas] = useState([]);
+  const [debitos, setDebitos] = useState([]); // NUEVO: Débitos automáticos
   const [loading, setLoading] = useState(true);
 
   // Cargar datos
@@ -21,16 +22,18 @@ export const DataProvider = ({ children }) => {
     if (!user) return;
     setLoading(true);
     try {
-      const [cSnap, mSnap, pSnap, cuSnap] = await Promise.all([
+      const [cSnap, mSnap, pSnap, cuSnap, dSnap] = await Promise.all([
         getDocs(collection(db, 'users', user.uid, 'cuentas')),
         getDocs(collection(db, 'users', user.uid, 'movimientos')),
         getDocs(collection(db, 'users', user.uid, 'pagos')),
-        getDocs(collection(db, 'users', user.uid, 'cuotas'))
+        getDocs(collection(db, 'users', user.uid, 'cuotas')),
+        getDocs(collection(db, 'users', user.uid, 'debitos'))
       ]);
       setCuentas(cSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setMovimientos(mSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setPagos(pSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setCuotas(cuSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setDebitos(dSnap.docs.map(d => ({ id: d.id, ...d.data() })));
     } catch (e) {
       console.error('Error cargando datos:', e);
     }
@@ -58,7 +61,6 @@ export const DataProvider = ({ children }) => {
   const eliminarCuenta = async (id) => {
     if (!user) return;
     await deleteDoc(doc(db, 'users', user.uid, 'cuentas', id));
-    // Eliminar movimientos y pagos asociados
     for (const m of movimientos.filter(m => m.cuentaId === id)) {
       await deleteDoc(doc(db, 'users', user.uid, 'movimientos', m.id));
     }
@@ -128,21 +130,41 @@ export const DataProvider = ({ children }) => {
     if (!user) return;
     await deleteDoc(doc(db, 'users', user.uid, 'cuotas', id));
     setCuotas(cuotas.filter(c => c.id !== id));
-    // Eliminar movimientos de esta cuota
     for (const m of movimientos.filter(m => m.cuotaId === id)) {
       await deleteDoc(doc(db, 'users', user.uid, 'movimientos', m.id));
     }
     setMovimientos(movimientos.filter(m => m.cuotaId !== id));
   };
 
+  // CRUD Débitos Automáticos
+  const guardarDebito = async (data) => {
+    if (!user) return;
+    const ref = await addDoc(collection(db, 'users', user.uid, 'debitos'), { ...data, activo: true });
+    setDebitos([...debitos, { id: ref.id, ...data, activo: true }]);
+    return ref.id;
+  };
+
+  const actualizarDebito = async (id, data) => {
+    if (!user) return;
+    await updateDoc(doc(db, 'users', user.uid, 'debitos', id), data);
+    setDebitos(debitos.map(d => d.id === id ? { ...d, ...data } : d));
+  };
+
+  const eliminarDebito = async (id) => {
+    if (!user) return;
+    await deleteDoc(doc(db, 'users', user.uid, 'debitos', id));
+    setDebitos(debitos.filter(d => d.id !== id));
+  };
+
   return (
     <DataContext.Provider value={{
-      cuentas, movimientos, pagos, cuotas, loading,
+      cuentas, movimientos, pagos, cuotas, debitos, loading,
       cargarDatos,
       guardarCuenta, actualizarCuenta, eliminarCuenta,
       guardarMovimiento, actualizarMovimiento, eliminarMovimiento,
       guardarPago, actualizarPago, eliminarPago,
-      guardarCuota, actualizarCuota, eliminarCuota
+      guardarCuota, actualizarCuota, eliminarCuota,
+      guardarDebito, actualizarDebito, eliminarDebito
     }}>
       {children}
     </DataContext.Provider>

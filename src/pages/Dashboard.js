@@ -66,18 +66,24 @@ const Dashboard = ({ setModal, setCuentaEditar, setCuentaActiva, setTab, setCuot
         </button>
       </div>
 
-      {/* Débitos Automáticos */}
-      {debitosActivos.length > 0 && (
-        <div className={`border rounded-2xl p-5 ${theme.card} ${theme.border}`}>
-          <div className="flex justify-between items-center mb-4">
-            <h3 className={`font-bold text-lg flex items-center gap-2 ${theme.text}`}>
-              <Zap className="w-6 h-6 text-yellow-500" /> Débitos Automáticos
-            </h3>
-            <button onClick={() => setModal('debito')} className="p-2 bg-yellow-500 text-white rounded-xl">
-              <PlusCircle className="w-5 h-5" />
-            </button>
-          </div>
-          {debitosActivos.map(d => (
+      {/* Débitos Automáticos - SIEMPRE visible */}
+      <div className={`border rounded-2xl p-5 ${theme.card} ${theme.border}`}>
+        <div className="flex justify-between items-center mb-4">
+          <h3 className={`font-bold text-lg flex items-center gap-2 ${theme.text}`}>
+            <Zap className="w-6 h-6 text-yellow-500" /> Débitos Automáticos
+          </h3>
+          <button onClick={() => setModal('debito')} className="p-2 bg-yellow-500 text-white rounded-xl flex items-center gap-2">
+            <PlusCircle className="w-5 h-5" />
+            <span className="text-sm font-medium">Agregar</span>
+          </button>
+        </div>
+        {debitosActivos.length === 0 ? (
+          <p className={`text-center py-4 ${theme.textMuted}`}>
+            No hay débitos automáticos configurados.<br/>
+            <span className="text-sm">Agregá servicios que se debitan cada mes (luz, gas, Netflix, etc.)</span>
+          </p>
+        ) : (
+          debitosActivos.map(d => (
             <div key={d.id} className={`flex justify-between items-center p-4 rounded-xl mb-3 ${darkMode ? 'bg-gray-700' : 'bg-slate-50'}`}>
               <div className="flex-1">
                 <p className={`font-semibold text-base ${theme.text}`}>{d.descripcion}</p>
@@ -87,9 +93,9 @@ const Dashboard = ({ setModal, setCuentaEditar, setCuentaActiva, setTab, setCuot
               <button onClick={() => { setDebitoEditar(d); setModal('editarDebito'); }} className="p-2 text-blue-500"><Edit3 className="w-5 h-5" /></button>
               <button onClick={() => { if(window.confirm('¿Eliminar?')) eliminarDebito(d.id); }} className="p-2 text-red-500"><Trash2 className="w-5 h-5" /></button>
             </div>
-          ))}
-        </div>
-      )}
+          ))
+        )}
+      </div>
 
       {/* Cuotas activas */}
       {cuotasActivas.length > 0 && (
@@ -111,13 +117,6 @@ const Dashboard = ({ setModal, setCuentaEditar, setCuentaActiva, setTab, setCuot
             </div>
           ))}
         </div>
-      )}
-
-      {/* Botón agregar débito si no hay */}
-      {debitosActivos.length === 0 && (
-        <button onClick={() => setModal('debito')} className={`w-full p-4 rounded-xl border-2 border-dashed ${theme.border} ${theme.textMuted} text-base font-medium flex items-center justify-center gap-2`}>
-          <Zap className="w-5 h-5" /> Agregar Débito Automático
-        </button>
       )}
 
       {/* Cuentas */}

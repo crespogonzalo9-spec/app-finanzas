@@ -139,18 +139,67 @@ export const ModalDebito = ({ onClose }) => {
   const [cuentaId, setCuentaId] = useState('');
   const [desc, setDesc] = useState('');
   const [monto, setMonto] = useState('');
-  const guardar = async () => { const cuenta = cuentas.find(c => c.id === cuentaId); await guardarDebito({ cuentaId, descripcion: desc, monto: parseFloat(monto), cuentaNombre: cuenta?.nombre }); onClose(); };
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState('');
+  
+  const guardar = async () => {
+    if (!cuentaId || !desc || !monto) {
+      setError('Completá todos los campos');
+      return;
+    }
+    setGuardando(true);
+    setError('');
+    try {
+      const cuenta = cuentas.find(c => c.id === cuentaId);
+      await guardarDebito({ 
+        cuentaId, 
+        descripcion: desc, 
+        monto: parseFloat(monto), 
+        cuentaNombre: cuenta?.nombre,
+        activo: true
+      });
+      onClose();
+    } catch (e) {
+      console.error('Error guardando débito:', e);
+      setError('Error al guardar. Intentá de nuevo.');
+    }
+    setGuardando(false);
+  };
+  
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div className={`rounded-2xl w-full max-w-lg ${theme.card}`} onClick={e => e.stopPropagation()}>
-        <div className={`p-5 border-b flex justify-between ${theme.border}`}><h3 className={`font-bold text-xl ${theme.text}`}>⚡ Nuevo Débito Automático</h3><button onClick={onClose}><X className={`w-7 h-7 ${theme.text}`} /></button></div>
-        <div className="p-5 space-y-5">
-          <p className={`text-base ${theme.textMuted}`}>Se carga automáticamente cada vez que cerrás un período.</p>
-          <select value={cuentaId} onChange={e => setCuentaId(e.target.value)} className={`w-full p-4 border rounded-xl text-lg ${theme.input}`}><option value="">Cuenta...</option>{cuentasContables.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}</select>
-          <input type="text" value={desc} onChange={e => setDesc(e.target.value)} placeholder="Ej: Boleta de Luz, Netflix..." className={`w-full p-4 border rounded-xl text-lg ${theme.input}`} />
-          <input type="number" value={monto} onChange={e => setMonto(e.target.value)} placeholder="Monto mensual" className={`w-full p-4 border rounded-xl text-lg ${theme.input}`} />
+        <div className={`p-5 border-b flex justify-between ${theme.border}`}>
+          <h3 className={`font-bold text-xl ${theme.text}`}>⚡ Nuevo Débito Automático</h3>
+          <button onClick={onClose}><X className={`w-7 h-7 ${theme.text}`} /></button>
         </div>
-        <div className={`p-5 border-t flex gap-4 ${theme.border}`}><button onClick={onClose} className={`flex-1 p-4 border rounded-xl text-lg ${theme.border} ${theme.text}`}>Cancelar</button><button onClick={guardar} disabled={!cuentaId || !monto || !desc} className="flex-1 p-4 bg-yellow-500 text-white rounded-xl text-lg font-semibold disabled:opacity-50">Guardar</button></div>
+        <div className="p-5 space-y-5">
+          <p className={`text-base ${theme.textMuted}`}>
+            Se carga automáticamente cada vez que cerrás un período.
+          </p>
+          {error && <p className="text-red-500 text-center p-3 bg-red-100 rounded-xl">{error}</p>}
+          <div>
+            <label className={`text-base mb-2 block ${theme.textMuted}`}>Cuenta</label>
+            <select value={cuentaId} onChange={e => setCuentaId(e.target.value)} className={`w-full p-4 border rounded-xl text-lg ${theme.input}`}>
+              <option value="">Seleccioná una cuenta...</option>
+              {cuentasContables.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className={`text-base mb-2 block ${theme.textMuted}`}>Descripción</label>
+            <input type="text" value={desc} onChange={e => setDesc(e.target.value)} placeholder="Ej: Boleta de Luz, Netflix, Spotify..." className={`w-full p-4 border rounded-xl text-lg ${theme.input}`} />
+          </div>
+          <div>
+            <label className={`text-base mb-2 block ${theme.textMuted}`}>Monto mensual</label>
+            <input type="number" value={monto} onChange={e => setMonto(e.target.value)} placeholder="0" className={`w-full p-4 border rounded-xl text-lg ${theme.input}`} />
+          </div>
+        </div>
+        <div className={`p-5 border-t flex gap-4 ${theme.border}`}>
+          <button onClick={onClose} className={`flex-1 p-4 border rounded-xl text-lg ${theme.border} ${theme.text}`}>Cancelar</button>
+          <button onClick={guardar} disabled={guardando || !cuentaId || !monto || !desc} className="flex-1 p-4 bg-yellow-500 text-white rounded-xl text-lg font-semibold disabled:opacity-50">
+            {guardando ? 'Guardando...' : 'Guardar'}
+          </button>
+        </div>
       </div>
     </div>
   );

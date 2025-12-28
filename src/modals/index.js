@@ -94,9 +94,9 @@ export const ModalEditarCuenta = ({ cuenta, onClose, onUpdate }) => {
   );
 };
 
-// MODAL CONSUMO
+// MODAL CONSUMO - CON SISTEMA DE CUOTAS MEJORADO
 export const ModalConsumo = ({ onClose }) => {
-  const { theme } = useTheme();
+  const { darkMode, theme } = useTheme();
   const { guardarMovimiento, guardarCuota } = useData();
   const { cuentasContables } = useCalculations();
   const [cuentaId, setCuentaId] = useState('');
@@ -105,27 +105,210 @@ export const ModalConsumo = ({ onClose }) => {
   const [cat, setCat] = useState('otros');
   const [fecha, setFecha] = useState(today());
   const [esCuota, setEsCuota] = useState(false);
-  const [cuotaActual, setCuotaActual] = useState('1');
-  const [cuotasTotales, setCuotasTotales] = useState('');
+  
+  // Opciones de cuotas
+  const [modoCuota, setModoCuota] = useState('total'); // 'total' o 'cuota'
+  const [montoIngresado, setMontoIngresado] = useState('');
+  const [cantidadCuotas, setCantidadCuotas] = useState('');
+  const [cuotaInicial, setCuotaInicial] = useState('1');
+  
+  // Cálculos de cuotas
+  const montoNum = parseFloat(montoIngresado) || 0;
+  const cuotasNum = parseInt(cantidadCuotas) || 0;
+  const cuotaInicialNum = parseInt(cuotaInicial) || 1;
+  
+  // Calcular monto total y monto por cuota según el modo
+  const montoTotal = modoCuota === 'total' ? montoNum : montoNum * cuotasNum;
+  const montoPorCuota = modoCuota === 'total' ? (cuotasNum > 0 ? montoNum / cuotasNum : 0) : montoNum;
+  
+  // Cuotas que realmente se van a pagar (desde cuotaInicial hasta el final)
+  const cuotasAPagar = cuotasNum - cuotaInicialNum + 1;
+  const montoTotalAPagar = montoPorCuota * cuotasAPagar;
+  
   const guardar = async () => {
-    if (esCuota && cuotasTotales) { const total = parseInt(cuotasTotales), actual = parseInt(cuotaActual) || 1, pend = total - actual; const cuotaId = await guardarCuota({ cuentaId, descripcion: desc, montoCuota: parseFloat(monto), cuotasTotales: total, cuotasPendientes: pend, estado: pend <= 0 ? 'finalizada' : 'activa' }); await guardarMovimiento({ cuentaId, descripcion: `${desc} (${actual}/${total})`, monto: parseFloat(monto), categoria: 'cuota', fecha, esCuota: true, cuotaId }); }
-    else { await guardarMovimiento({ cuentaId, descripcion: desc, monto: parseFloat(monto), categoria: cat, fecha }); }
+    if (esCuota && cuotasNum > 0) {
+      // Guardar la cuota con info completa
+      const cuotaId = await guardarCuota({ 
+        cuentaId, 
+        descripcion: desc, 
+        montoCuota: montoPorCuota,
+        montoTotal: montoTotal,
+        cuotasTotales: cuotasNum, 
+        cuotaInicial: cuotaInicialNum,
+        cuotaActual: cuotaInicialNum,
+        cuotasPendientes: cuotasAPagar - 1, // -1 porque la primera se carga ahora
+        estado: cuotasAPagar <= 1 ? 'finalizada' : 'activa' 
+      });
+      
+      // Crear movimiento de la primera cuota (cuotaInicial)
+      await guardarMovimiento({ 
+        cuentaId, 
+        descripcion: `${desc} (${cuotaInicialNum}/${cuotasNum})`,
+        monto: montoPorCuota, 
+        categoria: 'cuota', 
+        fecha, 
+        esCuota: true, 
+        cuotaId,
+        // Info adicional para mostrar
+        cuotaInfo: {
+          montoTotal,
+          montoCuota: montoPorCuota,
+          cuotaActual: cuotaInicialNum,
+          cuotasTotales: cuotasNum
+        }
+      });
+    } else {
+      await guardarMovimiento({ cuentaId, descripcion: desc, monto: parseFloat(monto), categoria: cat, fecha });
+    }
     onClose();
   };
+  
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div className={`rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto ${theme.card}`} onClick={e => e.stopPropagation()}>
-        <div className={`p-5 border-b flex justify-between sticky top-0 ${theme.card} ${theme.border}`}><h3 className={`font-bold text-xl ${theme.text}`}>Cargar Consumo</h3><button onClick={onClose}><X className={`w-7 h-7 ${theme.text}`} /></button></div>
-        <div className="p-5 space-y-5">
-          <select value={cuentaId} onChange={e => setCuentaId(e.target.value)} className={`w-full p-4 border rounded-xl text-lg ${theme.input}`}><option value="">Cuenta...</option>{cuentasContables.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}</select>
-          <input type="text" value={desc} onChange={e => setDesc(e.target.value)} placeholder="Descripción" className={`w-full p-4 border rounded-xl text-lg ${theme.input}`} />
-          <input type="number" value={monto} onChange={e => setMonto(e.target.value)} placeholder="Monto" className={`w-full p-4 border rounded-xl text-lg ${theme.input}`} />
-          {!esCuota && <select value={cat} onChange={e => setCat(e.target.value)} className={`w-full p-4 border rounded-xl text-lg ${theme.input}`}>{CATEGORIAS.filter(c => !['saldo_pendiente','debito_auto','cuota'].includes(c.id)).map(c => <option key={c.id} value={c.id}>{c.icon} {c.nombre}</option>)}</select>}
-          <DateInput label="Fecha" value={fecha} onChange={setFecha} />
-          <label className={`flex items-center gap-4 p-4 rounded-xl cursor-pointer ${theme.hover}`}><input type="checkbox" checked={esCuota} onChange={e => setEsCuota(e.target.checked)} className="w-6 h-6" /><span className={`text-lg ${theme.text}`}>Es pago en cuotas</span></label>
-          {esCuota && <div className="grid grid-cols-2 gap-4"><div><label className={`text-base ${theme.textMuted}`}>Cuota actual</label><input type="number" value={cuotaActual} onChange={e => setCuotaActual(e.target.value)} className={`w-full p-4 border rounded-xl text-lg ${theme.input}`} /></div><div><label className={`text-base ${theme.textMuted}`}>Total cuotas</label><input type="number" value={cuotasTotales} onChange={e => setCuotasTotales(e.target.value)} className={`w-full p-4 border rounded-xl text-lg ${theme.input}`} /></div></div>}
+        <div className={`p-5 border-b flex justify-between sticky top-0 ${theme.card} ${theme.border}`}>
+          <h3 className={`font-bold text-xl ${theme.text}`}>Cargar Consumo</h3>
+          <button onClick={onClose}><X className={`w-7 h-7 ${theme.text}`} /></button>
         </div>
-        <div className={`p-5 border-t flex gap-4 ${theme.border}`}><button onClick={onClose} className={`flex-1 p-4 border rounded-xl text-lg ${theme.border} ${theme.text}`}>Cancelar</button><button onClick={guardar} disabled={!cuentaId || !monto || !desc} className="flex-1 p-4 bg-amber-600 text-white rounded-xl text-lg font-semibold disabled:opacity-50">Guardar</button></div>
+        <div className="p-5 space-y-5">
+          <select value={cuentaId} onChange={e => setCuentaId(e.target.value)} className={`w-full p-4 border rounded-xl text-lg ${theme.input}`}>
+            <option value="">Cuenta...</option>
+            {cuentasContables.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+          </select>
+          
+          <input type="text" value={desc} onChange={e => setDesc(e.target.value)} placeholder="Descripción" className={`w-full p-4 border rounded-xl text-lg ${theme.input}`} />
+          
+          {/* Toggle cuotas */}
+          <label className={`flex items-center gap-4 p-4 rounded-xl cursor-pointer border-2 ${esCuota ? 'border-purple-500 bg-purple-500/10' : theme.border}`}>
+            <input type="checkbox" checked={esCuota} onChange={e => setEsCuota(e.target.checked)} className="w-6 h-6 accent-purple-500" />
+            <span className={`text-lg font-medium ${theme.text}`}>💳 Pago en cuotas</span>
+          </label>
+          
+          {!esCuota ? (
+            <>
+              <input type="number" value={monto} onChange={e => setMonto(e.target.value)} placeholder="Monto" className={`w-full p-4 border rounded-xl text-lg ${theme.input}`} />
+              <select value={cat} onChange={e => setCat(e.target.value)} className={`w-full p-4 border rounded-xl text-lg ${theme.input}`}>
+                {CATEGORIAS.filter(c => !['saldo_pendiente','debito_auto','cuota'].includes(c.id)).map(c => <option key={c.id} value={c.id}>{c.icon} {c.nombre}</option>)}
+              </select>
+            </>
+          ) : (
+            <>
+              {/* Selector de modo */}
+              <div className={`p-4 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
+                <p className={`font-semibold mb-3 ${theme.text}`}>¿Cómo querés cargar?</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <button 
+                    onClick={() => { setModoCuota('total'); setMontoIngresado(''); }}
+                    className={`p-3 rounded-xl text-center font-medium transition-all ${modoCuota === 'total' ? 'bg-purple-500 text-white' : `${theme.card} border ${theme.border}`}`}
+                  >
+                    <div className="text-2xl mb-1">💰</div>
+                    <div>Monto Total</div>
+                    <div className={`text-xs ${modoCuota === 'total' ? 'text-purple-200' : theme.textMuted}`}>Ej: $12.000 en 12 cuotas</div>
+                  </button>
+                  <button 
+                    onClick={() => { setModoCuota('cuota'); setMontoIngresado(''); }}
+                    className={`p-3 rounded-xl text-center font-medium transition-all ${modoCuota === 'cuota' ? 'bg-purple-500 text-white' : `${theme.card} border ${theme.border}`}`}
+                  >
+                    <div className="text-2xl mb-1">🧮</div>
+                    <div>Monto x Cuota</div>
+                    <div className={`text-xs ${modoCuota === 'cuota' ? 'text-purple-200' : theme.textMuted}`}>Ej: $1.000 x 12 cuotas</div>
+                  </button>
+                </div>
+              </div>
+              
+              {/* Inputs de cuotas */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={`text-sm mb-2 block ${theme.textMuted}`}>
+                    {modoCuota === 'total' ? '💰 Monto TOTAL' : '🧮 Monto por CUOTA'}
+                  </label>
+                  <input 
+                    type="number" 
+                    value={montoIngresado} 
+                    onChange={e => setMontoIngresado(e.target.value)} 
+                    placeholder="0" 
+                    className={`w-full p-4 border rounded-xl text-lg ${theme.input}`} 
+                  />
+                </div>
+                <div>
+                  <label className={`text-sm mb-2 block ${theme.textMuted}`}>📊 Cantidad de cuotas</label>
+                  <input 
+                    type="number" 
+                    value={cantidadCuotas} 
+                    onChange={e => setCantidadCuotas(e.target.value)} 
+                    placeholder="12" 
+                    className={`w-full p-4 border rounded-xl text-lg ${theme.input}`} 
+                  />
+                </div>
+              </div>
+              
+              {/* Cuota inicial */}
+              <div className={`p-4 rounded-xl border-2 border-dashed ${theme.border}`}>
+                <label className={`text-sm mb-2 block ${theme.textMuted}`}>
+                  🎯 ¿Desde qué cuota empezás a pagar?
+                </label>
+                <div className="flex items-center gap-4">
+                  <input 
+                    type="number" 
+                    value={cuotaInicial} 
+                    onChange={e => setCuotaInicial(e.target.value)} 
+                    min="1"
+                    max={cuotasNum || 99}
+                    className={`w-24 p-4 border rounded-xl text-lg text-center ${theme.input}`} 
+                  />
+                  <span className={`${theme.textMuted}`}>de {cuotasNum || '?'}</span>
+                </div>
+                {cuotaInicialNum > 1 && cuotasNum > 0 && (
+                  <p className={`text-sm mt-2 text-amber-500`}>
+                    ⚠️ Las cuotas 1-{cuotaInicialNum - 1} no se contabilizarán
+                  </p>
+                )}
+              </div>
+              
+              {/* Resumen */}
+              {montoNum > 0 && cuotasNum > 0 && (
+                <div className={`p-4 rounded-xl ${darkMode ? 'bg-purple-900/30' : 'bg-purple-50'} border border-purple-500`}>
+                  <h4 className={`font-bold mb-3 text-purple-500`}>📋 Resumen</h4>
+                  <div className="space-y-2 text-base">
+                    <div className="flex justify-between">
+                      <span className={theme.textMuted}>Compra total:</span>
+                      <span className={`font-bold ${theme.text}`}>{formatCurrency(montoTotal)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className={theme.textMuted}>Monto por cuota:</span>
+                      <span className={`font-bold ${theme.text}`}>{formatCurrency(montoPorCuota)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className={theme.textMuted}>Cuotas a pagar:</span>
+                      <span className={`font-bold ${theme.text}`}>{cuotaInicialNum}/{cuotasNum} → {cuotasNum}/{cuotasNum} ({cuotasAPagar} cuotas)</span>
+                    </div>
+                    <div className={`flex justify-between pt-2 border-t ${theme.border}`}>
+                      <span className={`font-bold ${theme.text}`}>Total a pagar:</span>
+                      <span className="font-bold text-xl text-purple-500">{formatCurrency(montoTotalAPagar)}</span>
+                    </div>
+                    {cuotaInicialNum > 1 && (
+                      <p className={`text-sm text-amber-500 mt-2`}>
+                        💡 Ya pagaste {cuotaInicialNum - 1} cuota(s) = {formatCurrency(montoPorCuota * (cuotaInicialNum - 1))}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+          
+          <DateInput label="Fecha" value={fecha} onChange={setFecha} />
+        </div>
+        <div className={`p-5 border-t flex gap-4 ${theme.border}`}>
+          <button onClick={onClose} className={`flex-1 p-4 border rounded-xl text-lg ${theme.border} ${theme.text}`}>Cancelar</button>
+          <button 
+            onClick={guardar} 
+            disabled={!cuentaId || !desc || (esCuota ? (!montoIngresado || !cantidadCuotas) : !monto)} 
+            className={`flex-1 p-4 text-white rounded-xl text-lg font-semibold disabled:opacity-50 ${esCuota ? 'bg-purple-600' : 'bg-amber-600'}`}
+          >
+            {esCuota ? `Guardar Cuota ${cuotaInicialNum}/${cuotasNum || '?'}` : 'Guardar'}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -357,25 +540,89 @@ export const ModalEditarPago = ({ pago, onClose }) => {
   );
 };
 
-// MODAL EDITAR CUOTA
+// MODAL EDITAR CUOTA - CON INFO COMPLETA
 export const ModalEditarCuota = ({ cuota, onClose }) => {
-  const { theme } = useTheme();
+  const { darkMode, theme } = useTheme();
   const { actualizarCuota } = useData();
   const [desc, setDesc] = useState(cuota?.descripcion || '');
-  const [monto, setMonto] = useState(cuota?.montoCuota?.toString() || '');
+  const [montoCuota, setMontoCuota] = useState(cuota?.montoCuota?.toString() || '');
   const [tot, setTot] = useState(cuota?.cuotasTotales?.toString() || '');
   const [pend, setPend] = useState(cuota?.cuotasPendientes?.toString() || '');
+  
   if (!cuota) return null;
+  
+  const montoCuotaNum = parseFloat(montoCuota) || 0;
+  const totNum = parseInt(tot) || 0;
+  const pendNum = parseInt(pend) || 0;
+  const cuotaActual = totNum - pendNum;
+  const montoTotal = cuota.montoTotal || (montoCuotaNum * totNum);
+  
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div className={`rounded-2xl w-full max-w-lg ${theme.card}`} onClick={e => e.stopPropagation()}>
-        <div className={`p-5 border-b flex justify-between ${theme.border}`}><h3 className={`font-bold text-xl ${theme.text}`}>Editar Cuota</h3><button onClick={onClose}><X className={`w-7 h-7 ${theme.text}`} /></button></div>
-        <div className="p-5 space-y-5">
-          <input type="text" value={desc} onChange={e => setDesc(e.target.value)} placeholder="Descripción" className={`w-full p-4 border rounded-xl text-lg ${theme.input}`} />
-          <input type="number" value={monto} onChange={e => setMonto(e.target.value)} placeholder="Monto/cuota" className={`w-full p-4 border rounded-xl text-lg ${theme.input}`} />
-          <div className="grid grid-cols-2 gap-4"><div><label className={`text-base ${theme.textMuted}`}>Totales</label><input type="number" value={tot} onChange={e => setTot(e.target.value)} className={`w-full p-4 border rounded-xl text-lg ${theme.input}`} /></div><div><label className={`text-base ${theme.textMuted}`}>Pendientes</label><input type="number" value={pend} onChange={e => setPend(e.target.value)} className={`w-full p-4 border rounded-xl text-lg ${theme.input}`} /></div></div>
+        <div className={`p-5 border-b flex justify-between ${theme.border}`}>
+          <h3 className={`font-bold text-xl ${theme.text}`}>Editar Cuota</h3>
+          <button onClick={onClose}><X className={`w-7 h-7 ${theme.text}`} /></button>
         </div>
-        <div className={`p-5 border-t flex gap-4 ${theme.border}`}><button onClick={onClose} className={`flex-1 p-4 border rounded-xl text-lg ${theme.border} ${theme.text}`}>Cancelar</button><button onClick={async () => { await actualizarCuota(cuota.id, { descripcion: desc, montoCuota: parseFloat(monto), cuotasTotales: parseInt(tot), cuotasPendientes: parseInt(pend), estado: parseInt(pend) <= 0 ? 'finalizada' : 'activa' }); onClose(); }} className="flex-1 p-4 bg-purple-600 text-white rounded-xl text-lg font-semibold">Guardar</button></div>
+        <div className="p-5 space-y-5">
+          {/* Info de la cuota */}
+          <div className={`p-4 rounded-xl ${darkMode ? 'bg-purple-900/30' : 'bg-purple-50'} border border-purple-500`}>
+            <div className="grid grid-cols-2 gap-4 text-center">
+              <div>
+                <div className={`text-sm ${theme.textMuted}`}>Compra total</div>
+                <div className="font-bold text-xl text-purple-500">{formatCurrency(montoTotal)}</div>
+              </div>
+              <div>
+                <div className={`text-sm ${theme.textMuted}`}>Progreso</div>
+                <div className="font-bold text-xl text-purple-500">{cuotaActual}/{totNum}</div>
+              </div>
+            </div>
+          </div>
+          
+          <input type="text" value={desc} onChange={e => setDesc(e.target.value)} placeholder="Descripción" className={`w-full p-4 border rounded-xl text-lg ${theme.input}`} />
+          
+          <div>
+            <label className={`text-sm mb-2 block ${theme.textMuted}`}>Monto por cuota</label>
+            <input type="number" value={montoCuota} onChange={e => setMontoCuota(e.target.value)} placeholder="Monto/cuota" className={`w-full p-4 border rounded-xl text-lg ${theme.input}`} />
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={`text-sm mb-2 block ${theme.textMuted}`}>Cuotas totales</label>
+              <input type="number" value={tot} onChange={e => setTot(e.target.value)} className={`w-full p-4 border rounded-xl text-lg ${theme.input}`} />
+            </div>
+            <div>
+              <label className={`text-sm mb-2 block ${theme.textMuted}`}>Cuotas pendientes</label>
+              <input type="number" value={pend} onChange={e => setPend(e.target.value)} className={`w-full p-4 border rounded-xl text-lg ${theme.input}`} />
+            </div>
+          </div>
+          
+          {/* Resumen */}
+          <div className={`p-4 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
+            <div className="flex justify-between">
+              <span className={theme.textMuted}>Restante por pagar:</span>
+              <span className="font-bold text-rose-500">{formatCurrency(montoCuotaNum * pendNum)}</span>
+            </div>
+          </div>
+        </div>
+        <div className={`p-5 border-t flex gap-4 ${theme.border}`}>
+          <button onClick={onClose} className={`flex-1 p-4 border rounded-xl text-lg ${theme.border} ${theme.text}`}>Cancelar</button>
+          <button 
+            onClick={async () => { 
+              await actualizarCuota(cuota.id, { 
+                descripcion: desc, 
+                montoCuota: parseFloat(montoCuota), 
+                cuotasTotales: parseInt(tot), 
+                cuotasPendientes: parseInt(pend), 
+                estado: parseInt(pend) <= 0 ? 'finalizada' : 'activa' 
+              }); 
+              onClose(); 
+            }} 
+            className="flex-1 p-4 bg-purple-600 text-white rounded-xl text-lg font-semibold"
+          >
+            Guardar
+          </button>
+        </div>
       </div>
     </div>
   );

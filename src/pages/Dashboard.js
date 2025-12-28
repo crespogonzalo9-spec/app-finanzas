@@ -103,19 +103,51 @@ const Dashboard = ({ setModal, setCuentaEditar, setCuentaActiva, setTab, setCuot
           <h3 className={`font-bold text-lg mb-4 flex items-center gap-2 ${theme.text}`}>
             <Repeat className="w-6 h-6 text-purple-500" /> Cuotas Activas
           </h3>
-          {cuotasActivas.map(c => (
-            <div key={c.id} className={`flex justify-between items-center p-4 rounded-xl mb-3 ${darkMode ? 'bg-gray-700' : 'bg-slate-50'}`}>
-              <div className="flex-1">
-                <p className={`font-semibold text-base ${theme.text}`}>{c.descripcion}</p>
-                <p className={`text-sm ${theme.textMuted}`}>
-                  Próxima: {c.cuotasTotales - c.cuotasPendientes + 1}/{c.cuotasTotales} • Restan {c.cuotasPendientes}
-                </p>
+          {cuotasActivas.map(c => {
+            const cuotaActual = c.cuotasTotales - c.cuotasPendientes;
+            const proximaCuota = cuotaActual + 1;
+            const montoTotal = c.montoTotal || (c.montoCuota * c.cuotasTotales);
+            const montoPagado = c.montoCuota * cuotaActual;
+            const montoRestante = c.montoCuota * c.cuotasPendientes;
+            
+            return (
+              <div key={c.id} className={`p-4 rounded-xl mb-3 ${darkMode ? 'bg-gray-700' : 'bg-slate-50'}`}>
+                <div className="flex justify-between items-start mb-2">
+                  <div className="flex-1">
+                    <p className={`font-semibold text-base ${theme.text}`}>{c.descripcion}</p>
+                    <p className={`text-xs ${theme.textMuted}`}>
+                      Total: {formatCurrency(montoTotal)} • Cuota: {formatCurrency(c.montoCuota)}
+                    </p>
+                  </div>
+                  <div className="flex gap-1">
+                    <button onClick={() => { setCuotaEditar(c); setModal('editarCuota'); }} className="p-2 text-blue-500"><Edit3 className="w-4 h-4" /></button>
+                    <button onClick={() => { if(window.confirm('¿Eliminar?')) eliminarCuota(c.id); }} className="p-2 text-red-500"><Trash2 className="w-4 h-4" /></button>
+                  </div>
+                </div>
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-sm px-2 py-1 rounded-full ${darkMode ? 'bg-purple-900 text-purple-300' : 'bg-purple-100 text-purple-700'}`}>
+                      Próxima: {proximaCuota}/{c.cuotasTotales}
+                    </span>
+                    <span className={`text-xs ${theme.textMuted}`}>
+                      Restan {c.cuotasPendientes} cuotas
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-lg text-purple-500">{formatCurrency(c.montoCuota)}</p>
+                    <p className={`text-xs ${theme.textMuted}`}>Restante: {formatCurrency(montoRestante)}</p>
+                  </div>
+                </div>
+                {/* Barra de progreso */}
+                <div className={`mt-3 h-2 rounded-full ${darkMode ? 'bg-gray-600' : 'bg-gray-200'}`}>
+                  <div 
+                    className="h-full rounded-full bg-purple-500 transition-all"
+                    style={{ width: `${(cuotaActual / c.cuotasTotales) * 100}%` }}
+                  />
+                </div>
               </div>
-              <p className="font-bold text-lg text-purple-500 mr-3">{formatCurrency(c.montoCuota)}</p>
-              <button onClick={() => { setCuotaEditar(c); setModal('editarCuota'); }} className="p-2 text-blue-500"><Edit3 className="w-5 h-5" /></button>
-              <button onClick={() => { if(window.confirm('¿Eliminar?')) eliminarCuota(c.id); }} className="p-2 text-red-500"><Trash2 className="w-5 h-5" /></button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

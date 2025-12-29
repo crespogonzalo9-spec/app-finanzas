@@ -314,16 +314,17 @@ export const ModalConsumo = ({ onClose }) => {
   );
 };
 
-// MODAL DÉBITO
+// MODAL DÉBITO - Genera movimiento al crear
 export const ModalDebito = ({ onClose }) => {
   const { theme } = useTheme();
-  const { guardarDebito, cuentas } = useData();
+  const { guardarDebito, guardarMovimiento, cuentas } = useData();
   const { cuentasContables } = useCalculations();
   const [cuentaId, setCuentaId] = useState('');
   const [desc, setDesc] = useState('');
   const [monto, setMonto] = useState('');
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState('');
+  const [generarAhora, setGenerarAhora] = useState(true); // Por defecto genera el consumo
   
   const guardar = async () => {
     if (!cuentaId || !desc || !monto) {
@@ -334,13 +335,30 @@ export const ModalDebito = ({ onClose }) => {
     setError('');
     try {
       const cuenta = cuentas.find(c => c.id === cuentaId);
-      await guardarDebito({ 
+      const montoNum = parseFloat(monto);
+      
+      // Guardar el débito automático
+      const debitoId = await guardarDebito({ 
         cuentaId, 
         descripcion: desc, 
-        monto: parseFloat(monto), 
+        monto: montoNum, 
         cuentaNombre: cuenta?.nombre,
         activo: true
       });
+      
+      // Si está marcado, generar el movimiento del período actual
+      if (generarAhora) {
+        await guardarMovimiento({
+          cuentaId,
+          descripcion: desc,
+          monto: montoNum,
+          categoria: 'debito_auto',
+          fecha: today(),
+          esDebitoAuto: true,
+          debitoId
+        });
+      }
+      
       onClose();
     } catch (e) {
       console.error('Error guardando débito:', e);
@@ -376,6 +394,15 @@ export const ModalDebito = ({ onClose }) => {
             <label className={`text-base mb-2 block ${theme.textMuted}`}>Monto mensual</label>
             <input type="number" value={monto} onChange={e => setMonto(e.target.value)} placeholder="0" className={`w-full p-4 border rounded-xl text-lg ${theme.input}`} />
           </div>
+          
+          {/* Opción de generar ahora */}
+          <label className={`flex items-center gap-4 p-4 rounded-xl cursor-pointer border-2 ${generarAhora ? 'border-yellow-500 bg-yellow-500/10' : theme.border}`}>
+            <input type="checkbox" checked={generarAhora} onChange={e => setGenerarAhora(e.target.checked)} className="w-6 h-6 accent-yellow-500" />
+            <div>
+              <span className={`text-lg font-medium ${theme.text}`}>Cargar en período actual</span>
+              <p className={`text-sm ${theme.textMuted}`}>Agrega el consumo de este mes ahora</p>
+            </div>
+          </label>
         </div>
         <div className={`p-5 border-t flex gap-4 ${theme.border}`}>
           <button onClick={onClose} className={`flex-1 p-4 border rounded-xl text-lg ${theme.border} ${theme.text}`}>Cancelar</button>

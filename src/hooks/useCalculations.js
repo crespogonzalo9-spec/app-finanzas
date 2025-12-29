@@ -129,10 +129,17 @@ export const useCalculations = () => {
   // ============================================
   
   /**
-   * DEUDA TOTAL = Solo saldos pendientes de todas las cuentas
+   * DEUDA TOTAL = Saldos pendientes - Pagos aplicados (saldos a favor)
    */
   const totalDeuda = useMemo(() => {
-    return cuentasContables.reduce((s, c) => s + getDeudaNeta(c.id), 0);
+    return cuentasContables.reduce((s, c) => {
+      const deudaBruta = getTotalDeuda(c.id);
+      const saldoPeriodo = getSaldoPeriodo(c.id);
+      // Si hay saldo a favor, resta de la deuda
+      const saldoAFavor = saldoPeriodo < 0 ? Math.abs(saldoPeriodo) : 0;
+      const deudaReal = Math.max(0, deudaBruta - saldoAFavor);
+      return s + deudaReal;
+    }, 0);
   }, [cuentasContables, movimientos, pagos]);
   
   /**

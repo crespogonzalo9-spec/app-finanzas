@@ -109,17 +109,19 @@ export const useCalculations = () => {
   };
 
   /**
-   * TOTAL A PAGAR = Deuda + Consumos del período (si es positivo)
-   * Si el período tiene saldo a favor, NO reduce la deuda automáticamente
-   * (el usuario debe aplicar el pago explícitamente a la deuda)
+   * TOTAL A PAGAR = Deuda + Saldo Período
+   * Si el período tiene saldo a favor (negativo), SE RESTA de la deuda
+   * El total nunca puede ser menor a 0
    */
   const getTotal = (cuentaId) => {
     const deuda = getDeudaNeta(cuentaId);
     const saldoPeriodo = getSaldoPeriodo(cuentaId);
     
-    // Total = Deuda + max(0, saldo período)
-    // Si el período está pagado o tiene saldo a favor, solo cuenta la deuda
-    return deuda + Math.max(0, saldoPeriodo);
+    // Total = Deuda + Saldo período (puede ser negativo si hay saldo a favor)
+    // Si saldoPeriodo es -400.000 y deuda es 933.000, total = 533.000
+    const total = deuda + saldoPeriodo;
+    
+    return Math.max(0, total);
   };
 
   // ============================================
@@ -144,7 +146,8 @@ export const useCalculations = () => {
   }, [cuentasContables, movimientos, pagos]);
   
   /**
-   * TOTAL A PAGAR = Deuda + Consumos
+   * TOTAL A PAGAR = Suma de totales de cada cuenta
+   * Cada cuenta ya considera el saldo a favor restando de la deuda
    */
   const totalAPagar = useMemo(() => {
     return cuentasContables.reduce((s, c) => s + getTotal(c.id), 0);

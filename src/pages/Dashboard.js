@@ -188,21 +188,20 @@ const Dashboard = ({ setModal, setCuentaEditar, setCuentaActiva, setTab, setCuot
                       ⚠️ Configurá fecha de cierre
                     </div>
                   </div>
-                ) : (
+                ) : deudaNeta > 0 ? (
+                  /* SI HAY DEUDA: Mostrar Deuda + Período + Total */
                   <>
                     <div className={`grid grid-cols-3 gap-3 p-4 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
                       <div className="text-center">
-                        <div className={`text-sm ${theme.textMuted}`}>Deuda</div>
-                        <div className={`text-lg font-bold ${deudaNeta > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                        <div className={`text-sm ${theme.textMuted}`}>🔴 Deuda</div>
+                        <div className="text-lg font-bold text-rose-500">
                           {formatCurrency(deudaNeta)}
                         </div>
                       </div>
                       <div className="text-center">
                         <div className={`text-sm ${theme.textMuted}`}>Período</div>
                         <div className={`text-lg font-bold ${
-                          saldoPeriodo > 0 ? 'text-amber-500' : 
-                          saldoPeriodo < 0 ? 'text-emerald-500' : 
-                          'text-emerald-500'
+                          saldoPeriodo > 0 ? 'text-amber-500' : 'text-emerald-500'
                         }`}>
                           {tieneSaldoAFavor && '-'}{formatCurrency(Math.abs(saldoPeriodo))}
                         </div>
@@ -214,6 +213,35 @@ const Dashboard = ({ setModal, setCuentaEditar, setCuentaActiva, setTab, setCuot
                         <div className={`text-sm ${theme.textMuted}`}>Total</div>
                         <div className={`text-lg font-bold ${total > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
                           {formatCurrency(total)}
+                        </div>
+                      </div>
+                    </div>
+                    <div className={`flex justify-between text-sm mt-3 ${theme.textMuted}`}>
+                      <span>🗓️ Cierre: {formatDate(c.cierreActual)}</span>
+                      <span>⏰ Vence: {formatDate(c.vencimientoActual)}</span>
+                    </div>
+                  </>
+                ) : (
+                  /* SIN DEUDA: Mostrar solo Período y Total */
+                  <>
+                    <div className={`p-4 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <div className={`text-sm ${theme.textMuted}`}>🛒 Período actual</div>
+                          <div className={`text-xl font-bold ${
+                            saldoPeriodo > 0 ? 'text-amber-500' : 'text-emerald-500'
+                          }`}>
+                            {tieneSaldoAFavor && '-'}{formatCurrency(Math.abs(saldoPeriodo))}
+                          </div>
+                          {tieneSaldoAFavor && (
+                            <div className="text-xs text-emerald-400">✓ Saldo a favor</div>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <div className={`text-sm ${theme.textMuted}`}>Total</div>
+                          <div className={`text-2xl font-bold ${total > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>
+                            {formatCurrency(total)}
+                          </div>
                         </div>
                       </div>
                     </div>

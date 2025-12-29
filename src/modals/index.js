@@ -516,7 +516,7 @@ export const ModalDeudas = ({ onClose }) => {
                   <span className={`font-bold text-base ${theme.text}`}>{c.nombre}</span>
                 </div>
                 
-                {/* Solo mostrar deuda si existe */}
+                {/* SOLO mostrar deuda si REALMENTE hay deuda (saldos pendientes) */}
                 {r.deudaNeta > 0 && (
                   <div className={`flex justify-between items-center p-2 rounded-lg mb-2 ${darkMode ? 'bg-rose-900/30' : 'bg-rose-50'}`}>
                     <span className={`text-sm ${theme.textMuted}`}>🔴 Deuda (períodos anteriores)</span>
@@ -524,15 +524,20 @@ export const ModalDeudas = ({ onClose }) => {
                   </div>
                 )}
                 
-                {/* Consumos del período */}
-                <div className={`flex justify-between items-center p-2 rounded-lg ${darkMode ? 'bg-amber-900/30' : 'bg-amber-50'}`}>
-                  <span className={`text-sm ${theme.textMuted}`}>🛒 Período actual</span>
-                  <span className={`font-bold ${r.saldoPeriodo > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>
-                    {r.tieneSaldoAFavor ? `- ${formatCurrency(Math.abs(r.saldoPeriodo))}` : formatCurrency(saldoPositivo)}
-                  </span>
-                </div>
+                {/* Consumos del período - SOLO si hay consumos positivos */}
+                {saldoPositivo > 0 && (
+                  <div className={`flex justify-between items-center p-2 rounded-lg ${darkMode ? 'bg-amber-900/30' : 'bg-amber-50'}`}>
+                    <span className={`text-sm ${theme.textMuted}`}>🛒 Período actual</span>
+                    <span className="font-bold text-amber-500">{formatCurrency(saldoPositivo)}</span>
+                  </div>
+                )}
+                
+                {/* Saldo a favor */}
                 {r.tieneSaldoAFavor && (
-                  <p className="text-xs text-emerald-500 mt-1 ml-2">✓ Saldo a favor</p>
+                  <div className={`flex justify-between items-center p-2 rounded-lg ${darkMode ? 'bg-emerald-900/30' : 'bg-emerald-50'}`}>
+                    <span className={`text-sm ${theme.textMuted}`}>✓ Saldo a favor</span>
+                    <span className="font-bold text-emerald-500">- {formatCurrency(Math.abs(r.saldoPeriodo))}</span>
+                  </div>
                 )}
                 
                 {/* Total de la cuenta */}
@@ -547,22 +552,24 @@ export const ModalDeudas = ({ onClose }) => {
           })}
         </div>
         
-        {/* Resumen final - más claro */}
+        {/* Resumen final */}
         <div className={`p-5 border-t ${theme.border}`}>
           <div className={`p-4 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
-            {/* Deuda total */}
-            <div className="flex justify-between items-center mb-2">
-              <span className={`${theme.textMuted}`}>🔴 Total Deuda:</span>
-              <span className={`font-bold text-lg ${totalDeuda > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
-                {formatCurrency(totalDeuda)}
-              </span>
-            </div>
+            {/* Deuda total - SOLO si hay */}
+            {totalDeuda > 0 && (
+              <div className="flex justify-between items-center mb-2">
+                <span className={`${theme.textMuted}`}>🔴 Total Deuda:</span>
+                <span className="font-bold text-lg text-rose-500">{formatCurrency(totalDeuda)}</span>
+              </div>
+            )}
             
-            {/* Consumos período */}
-            <div className="flex justify-between items-center mb-3">
-              <span className={`${theme.textMuted}`}>🛒 Total Período:</span>
-              <span className="font-bold text-lg text-amber-500">{formatCurrency(totalConsumos)}</span>
-            </div>
+            {/* Consumos período - SOLO si hay */}
+            {totalConsumos > 0 && (
+              <div className="flex justify-between items-center mb-3">
+                <span className={`${theme.textMuted}`}>🛒 Total Período:</span>
+                <span className="font-bold text-lg text-amber-500">{formatCurrency(totalConsumos)}</span>
+              </div>
+            )}
             
             {/* Línea divisora */}
             <div className={`border-t pt-3 ${theme.border}`}>

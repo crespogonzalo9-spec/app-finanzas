@@ -3,7 +3,7 @@
 // ============================================
 // SISTEMA DE VERSIÓN Y CACHE
 // ============================================
-export const APP_VERSION = '4.5.0';
+export const APP_VERSION = '4.6.0';
 export const CACHE_KEY = 'monity-version';
 
 if (typeof window !== 'undefined') {

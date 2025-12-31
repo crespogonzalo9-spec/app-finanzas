@@ -27,6 +27,7 @@ import WODs from './pages/WODs';
 import PRs from './pages/PRs';
 import Rankings from './pages/Rankings';
 import Schedule from './pages/Schedule';
+import MyClasses from './pages/MyClasses';
 import Calendar from './pages/Calendar';
 import News from './pages/News';
 import Invites from './pages/Invites';
@@ -131,7 +132,7 @@ function AppRoutes() {
         
         {/* Alumno */}
         <Route path="schedule" element={<Schedule />} />
-        <Route path="my-classes" element={<Schedule />} />
+        <Route path="my-classes" element={<MyClasses />} />
         <Route path="my-routines" element={<Routines />} />
         <Route path="my-prs" element={<PRs />} />
         

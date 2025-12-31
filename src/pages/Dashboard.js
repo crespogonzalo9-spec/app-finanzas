@@ -1,262 +1,404 @@
-// src/pages/Dashboard.js
-import React from 'react';
-import { Minus, Plus, Repeat, Edit3, Trash2, PlusCircle, Zap } from 'lucide-react';
-import { useTheme } from '../contexts/ThemeContext';
-import { useData } from '../contexts/DataContext';
-import { useCalculations } from '../hooks/useCalculations';
-import { EntidadLogo } from '../components/UI';
-import { TIPOS_CUENTA } from '../utils/constants';
-import { formatCurrency, formatDate } from '../utils/helpers';
+import React, { useState, useEffect } from 'react';
+import { Users, Calendar, Dumbbell, TrendingUp, Clock, ChevronRight, Flame, Award, Building2, Mail, UserPlus, Globe } from 'lucide-react';
+import { Card, Badge, Avatar, EmptyState, LoadingState, Button } from '../components/Common';
+import { useAuth } from '../contexts/AuthContext';
+import { useGym } from '../contexts/GymContext';
+import { db } from '../firebase';
+import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
+import { Link } from 'react-router-dom';
+import { getRoleName, getRolesNames, formatRelativeDate, formatDate } from '../utils/helpers';
 
-const Dashboard = ({ setModal, setCuentaEditar, setCuentaActiva, setTab, setCuotaEditar, setDebitoEditar }) => {
-  const { darkMode, theme } = useTheme();
-  const { cuotas, debitos, eliminarCuota, eliminarDebito } = useData();
-  const { 
-    cuentasContables, 
-    totalIngresos, 
-    totalDeuda, 
-    totalConsumos,
-    totalAPagar,
-    disponible,
-    getResumenCuenta
-  } = useCalculations();
+const Dashboard = () => {
+  const { userData, isSysadmin, isAdmin, isProfesor, isAlumno } = useAuth();
+  const { currentGym, availableGyms, selectGym, viewAllGyms } = useGym();
+  
+  const [stats, setStats] = useState({ members: 0, classes: 0, wods: 0, prs: 0, gyms: 0 });
+  const [recentWods, setRecentWods] = useState([]);
+  const [upcomingEvents, setUpcomingEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const cuotasActivas = cuotas.filter(c => c.estado === 'activa');
-  const debitosActivos = (debitos || []).filter(d => d.activo !== false);
+  useEffect(() => {
+    // Modo "Todos los gimnasios" para sysadmin
+    if (viewAllGyms && isSysadmin()) {
+      loadAllGymsStats();
+      return;
+    }
 
-  return (
-    <div className="space-y-6">
-      {/* Resumen - Grid responsive con texto ajustado */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
-        <button onClick={() => setModal('ingreso')} className={`p-4 lg:p-5 rounded-2xl text-left shadow-lg transition-transform active:scale-95 ${darkMode ? 'bg-gradient-to-br from-emerald-800 to-emerald-900' : 'bg-gradient-to-br from-emerald-50 to-emerald-100'}`}>
-          <div className={`text-xs lg:text-sm font-medium uppercase tracking-wide ${darkMode ? 'text-emerald-300' : 'text-emerald-600'}`}>💰 Ingresos</div>
-          <div className={`text-lg lg:text-2xl font-bold mt-1 lg:mt-2 truncate ${darkMode ? 'text-white' : 'text-emerald-700'}`}>{formatCurrency(totalIngresos)}</div>
-          <div className={`text-xs lg:text-sm mt-1 lg:mt-2 ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>+ Agregar</div>
-        </button>
-        
-        <button onClick={() => setModal('deudas')} className={`p-4 lg:p-5 rounded-2xl text-left shadow-lg transition-transform active:scale-95 ${darkMode ? 'bg-gradient-to-br from-rose-800 to-rose-900' : 'bg-gradient-to-br from-rose-50 to-rose-100'}`}>
-          <div className={`text-xs lg:text-sm font-medium uppercase tracking-wide ${darkMode ? 'text-rose-300' : 'text-rose-600'}`}>🔴 Deuda</div>
-          <div className={`text-lg lg:text-2xl font-bold mt-1 lg:mt-2 truncate ${darkMode ? 'text-white' : 'text-rose-700'}`}>{formatCurrency(totalDeuda)}</div>
-          <div className={`text-xs lg:text-sm mt-1 lg:mt-2 ${darkMode ? 'text-rose-400' : 'text-rose-600'}`}>Ver detalle</div>
-        </button>
-        
-        <div className={`p-4 lg:p-5 rounded-2xl shadow-lg ${darkMode ? 'bg-gradient-to-br from-amber-800 to-amber-900' : 'bg-gradient-to-br from-amber-50 to-amber-100'}`}>
-          <div className={`text-xs lg:text-sm font-medium uppercase tracking-wide ${darkMode ? 'text-amber-300' : 'text-amber-600'}`}>🛒 Período</div>
-          <div className={`text-lg lg:text-2xl font-bold mt-1 lg:mt-2 truncate ${darkMode ? 'text-white' : 'text-amber-700'}`}>{formatCurrency(totalConsumos)}</div>
+    if (!currentGym?.id) {
+      setLoading(false);
+      return;
+    }
+
+    // Cargar estadísticas del gimnasio seleccionado
+    const membersQuery = query(collection(db, 'users'), where('gymId', '==', currentGym.id));
+    const classesQuery = query(collection(db, 'classes'), where('gymId', '==', currentGym.id));
+    const wodsQuery = query(collection(db, 'wods'), where('gymId', '==', currentGym.id));
+    const prsQuery = query(collection(db, 'prs'), where('gymId', '==', currentGym.id), where('status', '==', 'validated'));
+
+    const unsubs = [];
+
+    unsubs.push(onSnapshot(membersQuery, snap => setStats(prev => ({ ...prev, members: snap.size }))));
+    unsubs.push(onSnapshot(classesQuery, snap => setStats(prev => ({ ...prev, classes: snap.size }))));
+    unsubs.push(onSnapshot(wodsQuery, snap => {
+      setStats(prev => ({ ...prev, wods: snap.size }));
+      const wods = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      wods.sort((a, b) => (b.createdAt?.toDate?.() || 0) - (a.createdAt?.toDate?.() || 0));
+      setRecentWods(wods.slice(0, 3));
+    }));
+    unsubs.push(onSnapshot(prsQuery, snap => setStats(prev => ({ ...prev, prs: snap.size }))));
+
+    // Próximos eventos
+    const eventsQuery = query(collection(db, 'events'), where('gymId', '==', currentGym.id));
+    unsubs.push(onSnapshot(eventsQuery, snap => {
+      const events = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const upcoming = events.filter(e => {
+        const date = e.date?.toDate ? e.date.toDate() : new Date(e.date);
+        return date >= new Date();
+      }).sort((a, b) => {
+        const da = a.date?.toDate ? a.date.toDate() : new Date(a.date);
+        const db = b.date?.toDate ? b.date.toDate() : new Date(b.date);
+        return da - db;
+      });
+      setUpcomingEvents(upcoming.slice(0, 3));
+    }));
+
+    setLoading(false);
+
+    return () => unsubs.forEach(u => u());
+  }, [currentGym, viewAllGyms, isSysadmin]);
+
+  const loadAllGymsStats = async () => {
+    try {
+      const [usersSnap, classesSnap, wodsSnap, prsSnap, gymsSnap] = await Promise.all([
+        getDocs(collection(db, 'users')),
+        getDocs(collection(db, 'classes')),
+        getDocs(collection(db, 'wods')),
+        getDocs(query(collection(db, 'prs'), where('status', '==', 'validated'))),
+        getDocs(collection(db, 'gyms'))
+      ]);
+
+      setStats({
+        members: usersSnap.size,
+        classes: classesSnap.size,
+        wods: wodsSnap.size,
+        prs: prsSnap.size,
+        gyms: gymsSnap.size
+      });
+
+      // WODs recientes de todos los gimnasios
+      const wods = wodsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      wods.sort((a, b) => (b.createdAt?.toDate?.() || 0) - (a.createdAt?.toDate?.() || 0));
+      setRecentWods(wods.slice(0, 5));
+
+      setLoading(false);
+    } catch (err) {
+      console.error('Error loading all gyms stats:', err);
+      setLoading(false);
+    }
+  };
+
+  // Sysadmin viendo todos los gimnasios
+  if (viewAllGyms && isSysadmin()) {
+    if (loading) return <LoadingState />;
+    
+    return (
+      <div className="space-y-6 animate-fadeIn">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h1 className="text-2xl font-bold">Hola, {userData?.name} 👑</h1>
+            <p className="text-gray-400 flex items-center gap-2">
+              <Globe size={16} className="text-blue-400" />
+              Vista global - Todos los gimnasios
+            </p>
+          </div>
+          <Badge className="bg-blue-500/20 text-blue-400">Sysadmin</Badge>
         </div>
-        
-        <div className={`p-4 lg:p-5 rounded-2xl shadow-lg ${darkMode ? 'bg-gradient-to-br from-blue-800 to-blue-900' : 'bg-gradient-to-br from-blue-50 to-blue-100'}`}>
-          <div className={`text-xs lg:text-sm font-medium uppercase tracking-wide ${darkMode ? 'text-blue-300' : 'text-blue-600'}`}>💵 Disponible</div>
-          <div className={`text-lg lg:text-2xl font-bold mt-1 lg:mt-2 truncate ${disponible >= 0 ? (darkMode ? 'text-white' : 'text-blue-700') : 'text-rose-500'}`}>{formatCurrency(disponible)}</div>
-        </div>
-      </div>
 
-      {/* Botones de acción */}
-      <div className="grid grid-cols-2 gap-4">
-        <button onClick={() => setModal('consumo')} className="flex items-center justify-center gap-3 p-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl font-semibold text-lg shadow-lg transition-transform active:scale-95">
-          <Minus className="w-6 h-6" /> Consumo
-        </button>
-        <button onClick={() => setModal('pago')} className="flex items-center justify-center gap-3 p-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl font-semibold text-lg shadow-lg transition-transform active:scale-95">
-          <Plus className="w-6 h-6" /> Pago
-        </button>
-      </div>
-
-      {/* Débitos Automáticos - SIEMPRE visible */}
-      <div className={`border rounded-2xl p-5 ${theme.card} ${theme.border}`}>
-        <div className="flex justify-between items-center mb-4">
-          <h3 className={`font-bold text-lg flex items-center gap-2 ${theme.text}`}>
-            <Zap className="w-6 h-6 text-yellow-500" /> Débitos Automáticos
-          </h3>
-          <button onClick={() => setModal('debito')} className="p-2 bg-yellow-500 text-white rounded-xl flex items-center gap-2">
-            <PlusCircle className="w-5 h-5" />
-            <span className="text-sm font-medium">Agregar</span>
-          </button>
+        {/* Stats globales */}
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+          <StatCard icon={Building2} label="Gimnasios" value={stats.gyms} color="yellow" />
+          <StatCard icon={Users} label="Usuarios" value={stats.members} color="blue" />
+          <StatCard icon={Calendar} label="Clases" value={stats.classes} color="green" />
+          <StatCard icon={Flame} label="WODs" value={stats.wods} color="orange" />
+          <StatCard icon={Award} label="PRs Validados" value={stats.prs} color="purple" />
         </div>
-        {debitosActivos.length === 0 ? (
-          <p className={`text-center py-4 ${theme.textMuted}`}>
-            No hay débitos automáticos configurados.<br/>
-            <span className="text-sm">Agregá servicios que se debitan cada mes (luz, gas, Netflix, etc.)</span>
-          </p>
-        ) : (
-          debitosActivos.map(d => (
-            <div key={d.id} className={`flex justify-between items-center p-4 rounded-xl mb-3 ${darkMode ? 'bg-gray-700' : 'bg-slate-50'}`}>
-              <div className="flex-1">
-                <p className={`font-semibold text-base ${theme.text}`}>{d.descripcion}</p>
-                <p className={`text-sm ${theme.textMuted}`}>Cada mes • {d.cuentaNombre || 'Sin asignar'}</p>
+
+        {/* Lista de gimnasios */}
+        <Card>
+          <h3 className="font-semibold mb-4">Gimnasios ({availableGyms.length})</h3>
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+            {availableGyms.map(gym => (
+              <div 
+                key={gym.id}
+                onClick={() => selectGym(gym.id)}
+                className="flex items-center gap-4 p-3 bg-gray-800/50 rounded-xl cursor-pointer hover:bg-gray-700/50 transition-colors"
+              >
+                <div className="w-12 h-12 rounded-xl bg-gray-700 flex items-center justify-center overflow-hidden">
+                  {gym.logo ? (
+                    <img src={gym.logo} alt={gym.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <Building2 className="text-gray-400" size={20} />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium truncate">{gym.name}</p>
+                  <p className="text-xs text-gray-500 truncate">{gym.address || 'Sin dirección'}</p>
+                </div>
+                <ChevronRight size={16} className="text-gray-500" />
               </div>
-              <p className="font-bold text-lg text-yellow-500 mr-3">{formatCurrency(d.monto)}</p>
-              <button onClick={() => { setDebitoEditar(d); setModal('editarDebito'); }} className="p-2 text-blue-500"><Edit3 className="w-5 h-5" /></button>
-              <button onClick={() => { if(window.confirm('¿Eliminar?')) eliminarDebito(d.id); }} className="p-2 text-red-500"><Trash2 className="w-5 h-5" /></button>
-            </div>
-          ))
-        )}
-      </div>
+            ))}
+          </div>
+        </Card>
 
-      {/* Cuotas activas */}
-      {cuotasActivas.length > 0 && (
-        <div className={`border rounded-2xl p-5 ${theme.card} ${theme.border}`}>
-          <h3 className={`font-bold text-lg mb-4 flex items-center gap-2 ${theme.text}`}>
-            <Repeat className="w-6 h-6 text-purple-500" /> Cuotas Activas
-          </h3>
-          {cuotasActivas.map(c => {
-            const cuotaActual = c.cuotasTotales - c.cuotasPendientes;
-            const proximaCuota = cuotaActual + 1;
-            const montoTotal = c.montoTotal || (c.montoCuota * c.cuotasTotales);
-            const montoPagado = c.montoCuota * cuotaActual;
-            const montoRestante = c.montoCuota * c.cuotasPendientes;
-            
-            return (
-              <div key={c.id} className={`p-4 rounded-xl mb-3 ${darkMode ? 'bg-gray-700' : 'bg-slate-50'}`}>
-                <div className="flex justify-between items-start mb-2">
-                  <div className="flex-1">
-                    <p className={`font-semibold text-base ${theme.text}`}>{c.descripcion}</p>
-                    <p className={`text-xs ${theme.textMuted}`}>
-                      Total: {formatCurrency(montoTotal)} • Cuota: {formatCurrency(c.montoCuota)}
+        {/* WODs Recientes globales */}
+        <Card>
+          <h3 className="font-semibold mb-4">WODs Recientes (Global)</h3>
+          {recentWods.length === 0 ? (
+            <p className="text-gray-500 text-center py-4">No hay WODs</p>
+          ) : (
+            <div className="space-y-3">
+              {recentWods.map(wod => (
+                <div key={wod.id} className="flex items-center gap-4 p-3 bg-gray-800/50 rounded-xl">
+                  <div className="w-10 h-10 bg-orange-500/20 rounded-lg flex items-center justify-center">
+                    <Flame className="text-orange-500" size={20} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{wod.name}</p>
+                    <p className="text-xs text-gray-500">
+                      {availableGyms.find(g => g.id === wod.gymId)?.name || 'Gimnasio'} • {formatRelativeDate(wod.createdAt)}
                     </p>
                   </div>
-                  <div className="flex gap-1">
-                    <button onClick={() => { setCuotaEditar(c); setModal('editarCuota'); }} className="p-2 text-blue-500"><Edit3 className="w-4 h-4" /></button>
-                    <button onClick={() => { if(window.confirm('¿Eliminar?')) eliminarCuota(c.id); }} className="p-2 text-red-500"><Trash2 className="w-4 h-4" /></button>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      </div>
+    );
+  }
+
+  // Sysadmin sin gimnasio seleccionado (y sin viewAllGyms)
+  if (isSysadmin() && !currentGym && !viewAllGyms) {
+    return (
+      <div className="space-y-6 animate-fadeIn">
+        <div>
+          <h1 className="text-2xl font-bold">Hola, {userData?.name} 👑</h1>
+          <p className="text-gray-400">Panel de Sysadmin</p>
+        </div>
+
+        <Card className="bg-yellow-500/10 border-yellow-500/30">
+          <div className="flex items-center gap-4">
+            <Building2 className="text-yellow-500" size={32} />
+            <div>
+              <h3 className="font-semibold text-yellow-400">Seleccioná un gimnasio</h3>
+              <p className="text-gray-400 text-sm">Como Sysadmin, podés acceder a cualquier gimnasio o ver todos</p>
+            </div>
+          </div>
+        </Card>
+
+        {availableGyms.length > 0 ? (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {availableGyms.map(gym => (
+              <Card 
+                key={gym.id} 
+                className="cursor-pointer hover:border-primary transition-colors"
+                onClick={() => selectGym(gym.id)}
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-xl bg-gray-700 flex items-center justify-center overflow-hidden">
+                    {gym.logo ? (
+                      <img src={gym.logo} alt={gym.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <Building2 className="text-gray-400" size={24} />
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">{gym.name}</h3>
+                    <p className="text-sm text-gray-400">{gym.address || 'Sin dirección'}</p>
                   </div>
                 </div>
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-2">
-                    <span className={`text-sm px-2 py-1 rounded-full ${darkMode ? 'bg-purple-900 text-purple-300' : 'bg-purple-100 text-purple-700'}`}>
-                      Próxima: {proximaCuota}/{c.cuotasTotales}
-                    </span>
-                    <span className={`text-xs ${theme.textMuted}`}>
-                      Restan {c.cuotasPendientes} cuotas
-                    </span>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-bold text-lg text-purple-500">{formatCurrency(c.montoCuota)}</p>
-                    <p className={`text-xs ${theme.textMuted}`}>Restante: {formatCurrency(montoRestante)}</p>
-                  </div>
-                </div>
-                {/* Barra de progreso */}
-                <div className={`mt-3 h-2 rounded-full ${darkMode ? 'bg-gray-600' : 'bg-gray-200'}`}>
-                  <div 
-                    className="h-full rounded-full bg-purple-500 transition-all"
-                    style={{ width: `${(cuotaActual / c.cuotasTotales) * 100}%` }}
-                  />
-                </div>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <Card>
+            <EmptyState 
+              icon={Building2} 
+              title="No hay gimnasios" 
+              description="Creá el primer gimnasio desde la sección Gimnasios"
+              action={<Link to="/gyms"><Button icon={Building2}>Ir a Gimnasios</Button></Link>}
+            />
+          </Card>
+        )}
+      </div>
+    );
+  }
+
+  // Usuario sin gimnasio asignado
+  if (!currentGym) {
+    return (
+      <div className="space-y-6 animate-fadeIn">
+        <div>
+          <h1 className="text-2xl font-bold">Hola, {userData?.name}</h1>
+          <p className="text-gray-400">{getRolesNames(userData?.roles)}</p>
+        </div>
+
+        <Card className="bg-blue-500/10 border-blue-500/30">
+          <div className="flex flex-col items-center text-center py-8">
+            <div className="w-20 h-20 rounded-full bg-blue-500/20 flex items-center justify-center mb-4">
+              <Building2 className="text-blue-400" size={40} />
+            </div>
+            <h3 className="text-xl font-semibold text-blue-400 mb-2">Sin gimnasio asignado</h3>
+            <p className="text-gray-400 mb-6 max-w-md">
+              Todavía no estás asociado a ningún gimnasio. Necesitás una invitación de un 
+              gimnasio para poder acceder a todas las funciones.
+            </p>
+            <div className="flex flex-col gap-3 text-sm text-gray-500">
+              <div className="flex items-center gap-2">
+                <Mail size={16} />
+                <span>Pedile al administrador de tu gimnasio que te envíe una invitación</span>
               </div>
-            );
-          })}
+              <div className="flex items-center gap-2">
+                <UserPlus size={16} />
+                <span>O usá un link de invitación si ya tenés uno</span>
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        <Card>
+          <h3 className="font-semibold mb-4">Tu cuenta</h3>
+          <div className="flex items-center gap-4">
+            <Avatar name={userData?.name} size="lg" />
+            <div>
+              <p className="font-medium">{userData?.name}</p>
+              <p className="text-sm text-gray-400">{userData?.email}</p>
+              <div className="mt-1">
+                {userData?.roles?.map(role => (
+                  <Badge key={role} className="mr-1 bg-gray-500/20 text-gray-400">
+                    {getRoleName(role)}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  // Dashboard normal con gimnasio
+  if (loading) return <LoadingState />;
+
+  return (
+    <div className="space-y-6 animate-fadeIn">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Hola, {userData?.name}</h1>
+          <p className="text-gray-400">{currentGym?.name}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {userData?.roles?.filter(r => r !== 'alumno').map(role => (
+            <Badge key={role} className={
+              role === 'sysadmin' ? 'bg-yellow-500/20 text-yellow-400' :
+              role === 'admin' ? 'bg-blue-500/20 text-blue-400' :
+              'bg-purple-500/20 text-purple-400'
+            }>
+              {getRoleName(role)}
+            </Badge>
+          ))}
+        </div>
+      </div>
+
+      {/* Stats */}
+      {(isAdmin() || isProfesor() || isSysadmin()) && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCard icon={Users} label="Miembros" value={stats.members} color="blue" />
+          <StatCard icon={Calendar} label="Clases" value={stats.classes} color="green" />
+          <StatCard icon={Flame} label="WODs" value={stats.wods} color="orange" />
+          <StatCard icon={Award} label="PRs Validados" value={stats.prs} color="purple" />
         </div>
       )}
 
-      {/* Cuentas */}
-      <div>
-        <div className="flex justify-between items-center mb-4">
-          <h2 className={`text-xl font-bold ${theme.text}`}>Cuentas</h2>
-          <button onClick={() => { setCuentaEditar(null); setModal('cuenta'); }} className="p-3 bg-indigo-600 text-white rounded-xl">
-            <PlusCircle className="w-6 h-6" />
-          </button>
-        </div>
-        
-        {/* Grid de cuentas - responsive */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {cuentasContables.map(c => {
-            const { deudaNeta, saldoPeriodo, total, tieneSaldoAFavor } = getResumenCuenta(c.id);
-            const sinFechas = !c.cierreActual;
-            
-            return (
-              <div 
-                key={c.id} 
-                onClick={() => { setCuentaActiva(c); setTab('detalle'); }} 
-                className={`p-5 rounded-2xl border cursor-pointer ${theme.border} ${theme.card} hover:shadow-xl transition-all`}
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-4">
-                    <EntidadLogo entidad={c.entidad} size={52} />
-                    <div>
-                      <div className={`font-bold text-lg ${theme.text}`}>{c.nombre}</div>
-                      <div className={`text-sm ${theme.textMuted}`}>{TIPOS_CUENTA.find(t => t.id === c.tipoCuenta)?.nombre}</div>
-                    </div>
+      <div className="grid lg:grid-cols-2 gap-6">
+        {/* WODs Recientes */}
+        <Card>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-semibold">WODs Recientes</h3>
+            <Link to="/wods" className="text-primary text-sm hover:underline flex items-center gap-1">
+              Ver todos <ChevronRight size={16} />
+            </Link>
+          </div>
+          {recentWods.length === 0 ? (
+            <p className="text-gray-500 text-center py-4">No hay WODs</p>
+          ) : (
+            <div className="space-y-3">
+              {recentWods.map(wod => (
+                <div key={wod.id} className="flex items-center gap-4 p-3 bg-gray-800/50 rounded-xl">
+                  <div className="w-10 h-10 bg-orange-500/20 rounded-lg flex items-center justify-center">
+                    <Flame className="text-orange-500" size={20} />
                   </div>
-                  <button onClick={(e) => { e.stopPropagation(); setCuentaEditar(c); setModal('editarCuenta'); }} className={`p-2 rounded-lg ${theme.hover}`}>
-                    <Edit3 className={`w-5 h-5 ${theme.textMuted}`} />
-                  </button>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{wod.name}</p>
+                    <p className="text-xs text-gray-500">{formatRelativeDate(wod.createdAt)}</p>
+                  </div>
                 </div>
-                
-                {sinFechas ? (
-                  <div className={`p-4 rounded-xl text-center ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
-                    <div className={`text-sm ${theme.textMuted} mb-2`}>Saldo Total</div>
-                    <div className={`text-2xl font-bold ${total > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(total)}</div>
-                    <div className={`text-sm mt-3 px-3 py-1 rounded-full inline-block ${darkMode ? 'bg-amber-900/50 text-amber-300' : 'bg-amber-100 text-amber-700'}`}>
-                      ⚠️ Configurá fecha de cierre
-                    </div>
+              ))}
+            </div>
+          )}
+        </Card>
+
+        {/* Próximos Eventos */}
+        <Card>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-semibold">Próximos Eventos</h3>
+            <Link to="/calendar" className="text-primary text-sm hover:underline flex items-center gap-1">
+              Ver calendario <ChevronRight size={16} />
+            </Link>
+          </div>
+          {upcomingEvents.length === 0 ? (
+            <p className="text-gray-500 text-center py-4">No hay eventos próximos</p>
+          ) : (
+            <div className="space-y-3">
+              {upcomingEvents.map(event => (
+                <div key={event.id} className="flex items-center gap-4 p-3 bg-gray-800/50 rounded-xl">
+                  <div className="w-10 h-10 bg-primary/20 rounded-lg flex items-center justify-center">
+                    <Calendar className="text-primary" size={20} />
                   </div>
-                ) : deudaNeta > 0 ? (
-                  /* SI HAY DEUDA: Mostrar Deuda + Período + Total */
-                  <>
-                    <div className={`grid grid-cols-3 gap-3 p-4 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
-                      <div className="text-center">
-                        <div className={`text-sm ${theme.textMuted}`}>🔴 Deuda</div>
-                        <div className="text-lg font-bold text-rose-500">
-                          {formatCurrency(deudaNeta)}
-                        </div>
-                      </div>
-                      <div className="text-center">
-                        <div className={`text-sm ${theme.textMuted}`}>Período</div>
-                        <div className={`text-lg font-bold ${
-                          saldoPeriodo > 0 ? 'text-amber-500' : 'text-emerald-500'
-                        }`}>
-                          {tieneSaldoAFavor && '-'}{formatCurrency(Math.abs(saldoPeriodo))}
-                        </div>
-                        {tieneSaldoAFavor && (
-                          <div className="text-xs text-emerald-400">A favor</div>
-                        )}
-                      </div>
-                      <div className="text-center">
-                        <div className={`text-sm ${theme.textMuted}`}>Total</div>
-                        <div className={`text-lg font-bold ${total > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
-                          {formatCurrency(total)}
-                        </div>
-                      </div>
-                    </div>
-                    <div className={`flex justify-between text-sm mt-3 ${theme.textMuted}`}>
-                      <span>🗓️ Cierre: {formatDate(c.cierreActual)}</span>
-                      <span>⏰ Vence: {formatDate(c.vencimientoActual)}</span>
-                    </div>
-                  </>
-                ) : (
-                  /* SIN DEUDA: Mostrar solo Período y Total */
-                  <>
-                    <div className={`p-4 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <div className={`text-sm ${theme.textMuted}`}>🛒 Período actual</div>
-                          <div className={`text-xl font-bold ${
-                            saldoPeriodo > 0 ? 'text-amber-500' : 'text-emerald-500'
-                          }`}>
-                            {tieneSaldoAFavor && '-'}{formatCurrency(Math.abs(saldoPeriodo))}
-                          </div>
-                          {tieneSaldoAFavor && (
-                            <div className="text-xs text-emerald-400">✓ Saldo a favor</div>
-                          )}
-                        </div>
-                        <div className="text-right">
-                          <div className={`text-sm ${theme.textMuted}`}>Total</div>
-                          <div className={`text-2xl font-bold ${total > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>
-                            {formatCurrency(total)}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className={`flex justify-between text-sm mt-3 ${theme.textMuted}`}>
-                      <span>🗓️ Cierre: {formatDate(c.cierreActual)}</span>
-                      <span>⏰ Vence: {formatDate(c.vencimientoActual)}</span>
-                    </div>
-                  </>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                  <div className="flex-1">
+                    <p className="font-medium">{event.title}</p>
+                    <p className="text-xs text-gray-500">{formatDate(event.date)} {event.time && `• ${event.time}`}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
       </div>
     </div>
+  );
+};
+
+const StatCard = ({ icon: Icon, label, value, color }) => {
+  const colors = {
+    blue: 'bg-blue-500/20 text-blue-500',
+    green: 'bg-green-500/20 text-green-500',
+    orange: 'bg-orange-500/20 text-orange-500',
+    purple: 'bg-purple-500/20 text-purple-500',
+    yellow: 'bg-yellow-500/20 text-yellow-500',
+  };
+
+  return (
+    <Card className="flex items-center gap-4">
+      <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${colors[color]}`}>
+        <Icon size={24} />
+      </div>
+      <div>
+        <p className="text-2xl font-bold">{value}</p>
+        <p className="text-sm text-gray-400">{label}</p>
+      </div>
+    </Card>
   );
 };
 

@@ -1,37 +1,194 @@
-// src/utils/constants.js
-
-export const BANCOS = [
-  { id: 'galicia', nombre: 'Banco Galicia', color: '#FF6B00' },
-  { id: 'santander', nombre: 'Banco Santander', color: '#EC0000' },
-  { id: 'bbva', nombre: 'BBVA', color: '#004481' },
-  { id: 'macro', nombre: 'Banco Macro', color: '#003399' },
-  { id: 'nacion', nombre: 'Banco Nación', color: '#003366' },
-  { id: 'provincia', nombre: 'Banco Provincia', color: '#006633' },
-  { id: 'icbc', nombre: 'ICBC', color: '#C8102E' },
-  { id: 'hsbc', nombre: 'HSBC', color: '#DB0011' },
-  { id: 'brubank', nombre: 'Brubank', color: '#6B21A8' },
-  { id: 'uala', nombre: 'Ualá', color: '#FF3366' },
-  { id: 'mercadopago', nombre: 'Mercado Pago', color: '#00BCFF' },
-  { id: 'naranja', nombre: 'Naranja X', color: '#FF6600' },
-  { id: 'otros', nombre: 'Otros', color: '#6B7280' },
+// Roles del sistema
+export const ROLES = [
+  { id: 'sysadmin', name: 'Sysadmin', level: 4 },
+  { id: 'admin', name: 'Administrador', level: 3 },
+  { id: 'profesor', name: 'Profesor', level: 2 },
+  { id: 'alumno', name: 'Alumno', level: 1 }
 ];
 
-export const TIPOS_CUENTA = [
-  { id: 'tarjeta_credito', nombre: 'Tarjeta de Crédito', icon: '💳' },
-  { id: 'prestamo', nombre: 'Préstamo', icon: '🏦' },
-  { id: 'cuenta_corriente', nombre: 'Cuenta Corriente', icon: '📋' },
-  { id: 'otros', nombre: 'Otros', icon: '📦' },
+// Tipos de ejercicios
+export const EXERCISE_TYPES = [
+  { id: 'strength', name: 'Fuerza' },
+  { id: 'olympic', name: 'Olímpico' },
+  { id: 'crossfit', name: 'CrossFit' },
+  { id: 'cardio', name: 'Cardio' },
+  { id: 'gymnastics', name: 'Gimnasia' },
+  { id: 'functional', name: 'Funcional' }
 ];
 
-export const CATEGORIAS = [
-  { id: 'supermercado', nombre: 'Supermercado', icon: '🛒' },
-  { id: 'restaurantes', nombre: 'Restaurantes', icon: '🍔' },
-  { id: 'transporte', nombre: 'Transporte', icon: '🚗' },
-  { id: 'servicios', nombre: 'Servicios', icon: '💡' },
-  { id: 'entretenimiento', nombre: 'Entretenimiento', icon: '🎬' },
-  { id: 'salud', nombre: 'Salud', icon: '🏥' },
-  { id: 'cuota', nombre: 'Cuota', icon: '🔄' },
-  { id: 'debito_auto', nombre: 'Débito Automático', icon: '⚡' },
-  { id: 'saldo_pendiente', nombre: 'Saldo Pendiente', icon: '⚠️' },
-  { id: 'otros', nombre: 'Otros', icon: '📦' },
+// Grupos musculares
+export const MUSCLE_GROUPS = [
+  { id: 'chest', name: 'Pecho' },
+  { id: 'back', name: 'Espalda' },
+  { id: 'shoulders', name: 'Hombros' },
+  { id: 'biceps', name: 'Bíceps' },
+  { id: 'triceps', name: 'Tríceps' },
+  { id: 'core', name: 'Core' },
+  { id: 'quadriceps', name: 'Cuádriceps' },
+  { id: 'hamstrings', name: 'Isquiotibiales' },
+  { id: 'glutes', name: 'Glúteos' },
+  { id: 'calves', name: 'Gemelos' },
+  { id: 'full_body', name: 'Cuerpo completo' }
+];
+
+// Días de la semana
+export const DAYS_OF_WEEK = [
+  { id: 0, name: 'Domingo', short: 'Dom' },
+  { id: 1, name: 'Lunes', short: 'Lun' },
+  { id: 2, name: 'Martes', short: 'Mar' },
+  { id: 3, name: 'Miércoles', short: 'Mié' },
+  { id: 4, name: 'Jueves', short: 'Jue' },
+  { id: 5, name: 'Viernes', short: 'Vie' },
+  { id: 6, name: 'Sábado', short: 'Sáb' }
+];
+
+// Tipos de WOD
+export const WOD_TYPES = [
+  { id: 'for_time', name: 'For Time', description: 'Completar lo más rápido posible' },
+  { id: 'amrap', name: 'AMRAP', description: 'Máximas rondas en tiempo' },
+  { id: 'emom', name: 'EMOM', description: 'Every Minute On the Minute' },
+  { id: 'tabata', name: 'Tabata', description: '20s trabajo / 10s descanso' },
+  { id: 'chipper', name: 'Chipper', description: 'Lista secuencial de ejercicios' },
+  { id: 'ladder', name: 'Ladder', description: 'Incremento/decremento progresivo' }
+];
+
+// Tipos de ranking
+export const RANKING_TYPES = [
+  { id: 'exercise', name: 'Por Ejercicio', description: 'Ranking de un ejercicio específico' },
+  { id: 'wod', name: 'Por WOD', description: 'Ranking de un WOD específico' },
+  { id: 'routine', name: 'Por Rutina', description: 'Ranking de una rutina completa' }
+];
+
+// Tipos de asignación de rutina/WOD
+export const ASSIGNMENT_TYPES = [
+  { id: 'class', name: 'Para una Clase', description: 'Asignar a todos los inscriptos de una clase' },
+  { id: 'individual', name: 'Individual', description: 'Asignar a personas específicas' }
+];
+
+// Estados de suscripción
+export const SUBSCRIPTION_STATUS = [
+  { id: 'active', name: 'Activa', color: 'success' },
+  { id: 'pending', name: 'Pendiente', color: 'warning' },
+  { id: 'expired', name: 'Vencida', color: 'error' },
+  { id: 'cancelled', name: 'Cancelada', color: 'neutral' }
+];
+
+// Estados de marca personal
+export const PR_STATUS = [
+  { id: 'pending', name: 'Pendiente', color: 'warning' },
+  { id: 'validated', name: 'Validada', color: 'success' },
+  { id: 'rejected', name: 'Rechazada', color: 'error' }
+];
+
+// Unidades de medida
+export const MEASUREMENT_UNITS = [
+  { id: 'kg', name: 'Kilogramos', type: 'weight' },
+  { id: 'lb', name: 'Libras', type: 'weight' },
+  { id: 'reps', name: 'Repeticiones', type: 'count' },
+  { id: 'rounds', name: 'Rondas', type: 'count' },
+  { id: 'seconds', name: 'Segundos', type: 'time' },
+  { id: 'minutes', name: 'Minutos', type: 'time' },
+  { id: 'meters', name: 'Metros', type: 'distance' },
+  { id: 'calories', name: 'Calorías', type: 'energy' }
+];
+
+// Rutas de navegación por rol
+export const NAV_ROUTES = {
+  sysadmin: [
+    { path: '/dashboard', name: 'Dashboard', icon: 'LayoutDashboard' },
+    { path: '/gyms', name: 'Gimnasios', icon: 'Building2' },
+    { path: '/users', name: 'Usuarios', icon: 'Users' },
+    { path: '/members', name: 'Alumnos', icon: 'Users' },
+    { path: '/profesores', name: 'Profesores', icon: 'UserCheck' },
+    { path: '/classes', name: 'Clases', icon: 'Calendar' },
+    { path: '/exercises', name: 'Ejercicios', icon: 'Dumbbell' },
+    { path: '/routines', name: 'Rutinas', icon: 'ClipboardList' },
+    { path: '/wods', name: 'WODs', icon: 'Flame' },
+    { path: '/calendar', name: 'Calendario', icon: 'CalendarDays' },
+    { path: '/news', name: 'Novedades', icon: 'Megaphone' },
+    { path: '/rankings', name: 'Rankings', icon: 'Trophy' },
+    { path: '/prs', name: 'Marcas Personales', icon: 'TrendingUp' },
+    { path: '/invites', name: 'Invitaciones', icon: 'Link' },
+    { path: '/gym-info', name: 'Info Gimnasio', icon: 'Building2' },
+    { path: '/profile', name: 'Mi Perfil', icon: 'User' },
+    { path: '/settings', name: 'Configuración', icon: 'Settings' }
+  ],
+  admin: [
+    { path: '/dashboard', name: 'Dashboard', icon: 'LayoutDashboard' },
+    { path: '/members', name: 'Alumnos', icon: 'Users' },
+    { path: '/profesores', name: 'Profesores', icon: 'UserCheck' },
+    { path: '/classes', name: 'Clases', icon: 'Calendar' },
+    { path: '/exercises', name: 'Ejercicios', icon: 'Dumbbell' },
+    { path: '/routines', name: 'Rutinas', icon: 'ClipboardList' },
+    { path: '/wods', name: 'WODs', icon: 'Flame' },
+    { path: '/calendar', name: 'Calendario', icon: 'CalendarDays' },
+    { path: '/news', name: 'Novedades', icon: 'Megaphone' },
+    { path: '/rankings', name: 'Rankings', icon: 'Trophy' },
+    { path: '/prs', name: 'Marcas Personales', icon: 'TrendingUp' },
+    { path: '/invites', name: 'Invitaciones', icon: 'Link' },
+    { path: '/gym-info', name: 'Info Gimnasio', icon: 'Building2' },
+    { path: '/profile', name: 'Mi Perfil', icon: 'User' },
+    { path: '/settings', name: 'Configuración', icon: 'Settings' }
+  ],
+  profesor: [
+    { path: '/dashboard', name: 'Dashboard', icon: 'LayoutDashboard' },
+    { path: '/my-classes', name: 'Mis Clases', icon: 'Calendar' },
+    { path: '/members', name: 'Alumnos', icon: 'Users' },
+    { path: '/exercises', name: 'Ejercicios', icon: 'Dumbbell' },
+    { path: '/routines', name: 'Rutinas', icon: 'ClipboardList' },
+    { path: '/wods', name: 'WODs', icon: 'Flame' },
+    { path: '/calendar', name: 'Calendario', icon: 'CalendarDays' },
+    { path: '/news', name: 'Novedades', icon: 'Megaphone' },
+    { path: '/prs', name: 'Validar PRs', icon: 'CheckCircle' },
+    { path: '/rankings', name: 'Rankings', icon: 'Trophy' },
+    { path: '/gym-info', name: 'Info Gimnasio', icon: 'Building2' },
+    { path: '/profile', name: 'Mi Perfil', icon: 'User' }
+  ],
+  alumno: [
+    { path: '/dashboard', name: 'Dashboard', icon: 'LayoutDashboard' },
+    { path: '/schedule', name: 'Horarios', icon: 'Calendar' },
+    { path: '/my-classes', name: 'Mis Clases', icon: 'CheckSquare' },
+    { path: '/exercises', name: 'Ejercicios', icon: 'Dumbbell' },
+    { path: '/my-routines', name: 'Mis Rutinas', icon: 'ClipboardList' },
+    { path: '/wods', name: 'WODs', icon: 'Flame' },
+    { path: '/calendar', name: 'Calendario', icon: 'CalendarDays' },
+    { path: '/news', name: 'Novedades', icon: 'Megaphone' },
+    { path: '/my-prs', name: 'Mis PRs', icon: 'TrendingUp' },
+    { path: '/rankings', name: 'Rankings', icon: 'Trophy' },
+    { path: '/gym-info', name: 'Info Gimnasio', icon: 'Building2' },
+    { path: '/profile', name: 'Mi Perfil', icon: 'User' }
+  ]
+};
+
+// Ejercicios predefinidos
+export const DEFAULT_EXERCISES = [
+  { name: 'Back Squat', type: 'strength', muscles: ['quadriceps', 'glutes'], unit: 'kg' },
+  { name: 'Front Squat', type: 'strength', muscles: ['quadriceps', 'core'], unit: 'kg' },
+  { name: 'Deadlift', type: 'strength', muscles: ['back', 'hamstrings', 'glutes'], unit: 'kg' },
+  { name: 'Bench Press', type: 'strength', muscles: ['chest', 'triceps'], unit: 'kg' },
+  { name: 'Overhead Press', type: 'strength', muscles: ['shoulders', 'triceps'], unit: 'kg' },
+  { name: 'Clean', type: 'olympic', muscles: ['full_body'], unit: 'kg' },
+  { name: 'Clean & Jerk', type: 'olympic', muscles: ['full_body'], unit: 'kg' },
+  { name: 'Snatch', type: 'olympic', muscles: ['full_body'], unit: 'kg' },
+  { name: 'Thruster', type: 'crossfit', muscles: ['quadriceps', 'shoulders'], unit: 'kg' },
+  { name: 'Wall Ball', type: 'crossfit', muscles: ['quadriceps', 'shoulders'], unit: 'reps' },
+  { name: 'Burpee', type: 'crossfit', muscles: ['full_body'], unit: 'reps' },
+  { name: 'Box Jump', type: 'crossfit', muscles: ['quadriceps', 'glutes'], unit: 'reps' },
+  { name: 'Pull Up', type: 'gymnastics', muscles: ['back', 'biceps'], unit: 'reps' },
+  { name: 'Muscle Up', type: 'gymnastics', muscles: ['back', 'chest'], unit: 'reps' },
+  { name: 'Double Under', type: 'crossfit', muscles: ['calves'], unit: 'reps' },
+  { name: 'Row', type: 'cardio', muscles: ['full_body'], unit: 'calories' },
+  { name: 'Run', type: 'cardio', muscles: ['quadriceps', 'calves'], unit: 'meters' }
+];
+
+// WODs Benchmark
+export const BENCHMARK_WODS = [
+  { name: 'Fran', type: 'for_time', description: '21-15-9: Thrusters (43/30kg) + Pull-ups' },
+  { name: 'Grace', type: 'for_time', description: '30 Clean & Jerk (61/43kg)' },
+  { name: 'Isabel', type: 'for_time', description: '30 Snatch (61/43kg)' },
+  { name: 'Helen', type: 'for_time', description: '3 rounds: 400m Run + 21 KB Swings + 12 Pull-ups' },
+  { name: 'Cindy', type: 'amrap', description: '20 min: 5 Pull-ups + 10 Push-ups + 15 Squats' },
+  { name: 'Murph', type: 'for_time', description: '1 mile + 100 Pull-ups + 200 Push-ups + 300 Squats + 1 mile' },
+  { name: 'Annie', type: 'for_time', description: '50-40-30-20-10: Double Unders + Sit-ups' },
+  { name: 'Diane', type: 'for_time', description: '21-15-9: Deadlift (102/70kg) + HSPU' }
 ];

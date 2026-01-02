@@ -173,28 +173,39 @@ export const useCalculations = () => {
 
   /**
    * Obtener resumen completo de una cuenta
+   * DEUDA REAL = deuda bruta - saldo a favor (si existe)
    */
   const getResumenCuenta = (cuentaId) => {
     const deudaBruta = getTotalDeuda(cuentaId);
-    const deudaNeta = getDeudaNeta(cuentaId);
     const consumosPeriodo = getConsumosPeriodo(cuentaId);
     const pagosPeriodo = getPagosPeriodo(cuentaId);
-    const saldoPeriodo = getSaldoPeriodo(cuentaId);
-    const total = getTotal(cuentaId);
+    const saldoPeriodo = getSaldoPeriodo(cuentaId); // consumos - pagos
+    
+    // Si hay saldo a favor (pagos > consumos), se aplica a la deuda
+    const saldoAFavor = saldoPeriodo < 0 ? Math.abs(saldoPeriodo) : 0;
+    const deudaReal = Math.max(0, deudaBruta - saldoAFavor);
+    
+    // Consumos pendientes (si no hay saldo a favor)
+    const consumosPendientes = Math.max(0, saldoPeriodo);
+    
+    // Total = deuda real + consumos pendientes
+    const total = deudaReal + consumosPendientes;
 
     return {
-      // Deuda (saldos pendientes de períodos anteriores)
-      deudaBruta,
-      deudaNeta,
+      // Deuda
+      deudaBruta,           // Saldos pendientes sin descontar
+      deudaNeta: deudaReal, // Deuda real (ya con pagos descontados)
+      saldoAFavor,          // Monto aplicado a la deuda
       // Período actual
-      consumosPeriodo,
-      pagosPeriodo,
-      saldoPeriodo,
+      consumosPeriodo,      // Consumos del mes
+      pagosPeriodo,         // Pagos realizados
+      saldoPeriodo,         // consumos - pagos (puede ser negativo)
+      consumosPendientes,   // Lo que queda por pagar del período
       // Total
       total,
       // Estados
       tieneSaldoAFavor: saldoPeriodo < 0,
-      tieneDeuda: deudaNeta > 0,
+      tieneDeuda: deudaReal > 0,
       estaAlDia: total === 0
     };
   };

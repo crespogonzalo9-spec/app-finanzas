@@ -158,7 +158,7 @@ const Dashboard = ({ setModal, setCuentaEditar, setCuentaActiva, setTab, setCuot
         {/* Grid de cuentas - responsive */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {cuentasContables.map(c => {
-            const { deudaNeta, saldoPeriodo, total, tieneSaldoAFavor } = getResumenCuenta(c.id);
+            const { deudaNeta, consumosPendientes, saldoAFavor, total, tieneDeuda } = getResumenCuenta(c.id);
             const sinFechas = !c.cierreActual;
             
             return (
@@ -188,8 +188,8 @@ const Dashboard = ({ setModal, setCuentaEditar, setCuentaActiva, setTab, setCuot
                       ⚠️ Configurá fecha de cierre
                     </div>
                   </div>
-                ) : deudaNeta > 0 ? (
-                  /* SI HAY DEUDA: Mostrar Deuda + Período + Total */
+                ) : tieneDeuda ? (
+                  /* SI HAY DEUDA: Mostrar Deuda (ya descontada) + Período + Total */
                   <>
                     <div className={`grid grid-cols-3 gap-3 p-4 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
                       <div className="text-center">
@@ -197,16 +197,17 @@ const Dashboard = ({ setModal, setCuentaEditar, setCuentaActiva, setTab, setCuot
                         <div className="text-lg font-bold text-rose-500">
                           {formatCurrency(deudaNeta)}
                         </div>
+                        {saldoAFavor > 0 && (
+                          <div className="text-xs text-emerald-400">(-{formatCurrency(saldoAFavor)})</div>
+                        )}
                       </div>
                       <div className="text-center">
-                        <div className={`text-sm ${theme.textMuted}`}>Período</div>
-                        <div className={`text-lg font-bold ${
-                          saldoPeriodo > 0 ? 'text-amber-500' : 'text-emerald-500'
-                        }`}>
-                          {tieneSaldoAFavor && '-'}{formatCurrency(Math.abs(saldoPeriodo))}
+                        <div className={`text-sm ${theme.textMuted}`}>🛒 Período</div>
+                        <div className={`text-lg font-bold ${consumosPendientes > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>
+                          {formatCurrency(consumosPendientes)}
                         </div>
-                        {tieneSaldoAFavor && (
-                          <div className="text-xs text-emerald-400">A favor</div>
+                        {consumosPendientes === 0 && (
+                          <div className="text-xs text-emerald-400">✓ Pagado</div>
                         )}
                       </div>
                       <div className="text-center">
@@ -228,13 +229,11 @@ const Dashboard = ({ setModal, setCuentaEditar, setCuentaActiva, setTab, setCuot
                       <div className="flex justify-between items-center">
                         <div>
                           <div className={`text-sm ${theme.textMuted}`}>🛒 Período actual</div>
-                          <div className={`text-xl font-bold ${
-                            saldoPeriodo > 0 ? 'text-amber-500' : 'text-emerald-500'
-                          }`}>
-                            {tieneSaldoAFavor && '-'}{formatCurrency(Math.abs(saldoPeriodo))}
+                          <div className={`text-xl font-bold ${consumosPendientes > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>
+                            {formatCurrency(consumosPendientes)}
                           </div>
-                          {tieneSaldoAFavor && (
-                            <div className="text-xs text-emerald-400">✓ Saldo a favor</div>
+                          {consumosPendientes === 0 && (
+                            <div className="text-xs text-emerald-400">✓ Pagado</div>
                           )}
                         </div>
                         <div className="text-right">

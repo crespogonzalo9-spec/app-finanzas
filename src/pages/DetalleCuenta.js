@@ -11,14 +11,26 @@ import { formatCurrency, formatDate } from '../utils/helpers';
 const DetalleCuenta = ({ cuenta, onBack, setModal, setCuentaEditar, setMovEditar, setPagoEditar, setModalCierre }) => {
   const { darkMode, theme } = useTheme();
   const { cuentas, movimientos, pagos, eliminarCuenta, eliminarMovimiento, eliminarPago } = useData();
-  const { getDeudaReal, getSaldoPeriodo } = useCalculations();
+  const { getTotalDeuda, getConsumosPeriodo, getPagosPeriodo, getSaldoPeriodo } = useCalculations();
 
   // Obtener cuenta actualizada
   const c = cuentas.find(cu => cu.id === cuenta.id) || cuenta;
   
-  const deuda = getDeudaReal(c.id);
-  const saldo = getSaldoPeriodo(c.id);
-  const total = deuda + saldo;
+  // Cálculos correctos
+  const deudaBruta = getTotalDeuda(c.id);  // Saldos pendientes
+  const consumos = getConsumosPeriodo(c.id);  // Consumos del período (cuotas, débitos, compras)
+  const pagosTotal = getPagosPeriodo(c.id);  // Pagos realizados
+  const saldoPeriodo = getSaldoPeriodo(c.id);  // consumos - pagos
+  
+  // Si hay saldo a favor (pagos > consumos), se aplica a la deuda
+  const saldoAFavor = saldoPeriodo < 0 ? Math.abs(saldoPeriodo) : 0;
+  const deudaNeta = Math.max(0, deudaBruta - saldoAFavor);
+  
+  // Consumos pendientes del período (si pagos no cubren todo)
+  const consumosPendientes = Math.max(0, saldoPeriodo);
+  
+  // Total real a pagar
+  const total = deudaNeta + consumosPendientes;
 
   // TODOS los movimientos no cerrados (incluye cuotas y saldos pendientes)
   const movsPeriodo = movimientos.filter(m => m.cuentaId === c.id && !m.periodoCerrado);
@@ -64,22 +76,54 @@ const DetalleCuenta = ({ cuenta, onBack, setModal, setCuentaEditar, setMovEditar
         </button>
       </div>
 
-      {/* Resumen */}
+      {/* Resumen - Nueva visualización */}
       <div className={`rounded-xl p-4 ${darkMode ? 'bg-gray-800' : 'bg-slate-100'}`}>
-        <div className="grid grid-cols-3 gap-3 text-center mb-3">
-          <div>
-            <div className={`text-sm ${theme.textMuted}`}>Deuda</div>
-            <div className={`text-lg font-bold ${deuda > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(deuda)}</div>
+        {/* Si hay deuda, mostrar deuda neta */}
+        {deudaBruta > 0 ? (
+          <div className="grid grid-cols-3 gap-3 text-center mb-3">
+            <div>
+              <div className={`text-sm ${theme.textMuted}`}>🔴 Deuda</div>
+              <div className="text-lg font-bold text-rose-500">{formatCurrency(deudaNeta)}</div>
+              {saldoAFavor > 0 && (
+                <div className="text-xs text-emerald-500">(-{formatCurrency(saldoAFavor)} aplicado)</div>
+              )}
+            </div>
+            <div>
+              <div className={`text-sm ${theme.textMuted}`}>🛒 Período</div>
+              <div className={`text-lg font-bold ${consumosPendientes > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>
+                {formatCurrency(consumosPendientes)}
+              </div>
+              {consumosPendientes === 0 && consumos > 0 && (
+                <div className="text-xs text-emerald-500">✓ Pagado</div>
+              )}
+            </div>
+            <div>
+              <div className={`text-sm ${theme.textMuted}`}>Total</div>
+              <div className={`text-lg font-bold ${total > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                {formatCurrency(total)}
+              </div>
+            </div>
           </div>
-          <div>
-            <div className={`text-sm ${theme.textMuted}`}>Período</div>
-            <div className={`text-lg font-bold ${saldo > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>{formatCurrency(saldo)}</div>
+        ) : (
+          /* Sin deuda, mostrar solo período */
+          <div className="flex justify-between items-center mb-3 px-4">
+            <div className="text-center flex-1">
+              <div className={`text-sm ${theme.textMuted}`}>🛒 Período</div>
+              <div className={`text-xl font-bold ${consumosPendientes > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>
+                {formatCurrency(consumosPendientes)}
+              </div>
+              {consumosPendientes === 0 && consumos > 0 && (
+                <div className="text-xs text-emerald-500">✓ Pagado</div>
+              )}
+            </div>
+            <div className="text-center flex-1">
+              <div className={`text-sm ${theme.textMuted}`}>Total</div>
+              <div className={`text-2xl font-bold ${total > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>
+                {formatCurrency(total)}
+              </div>
+            </div>
           </div>
-          <div>
-            <div className={`text-sm ${theme.textMuted}`}>Total</div>
-            <div className={`text-lg font-bold ${total > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(total)}</div>
-          </div>
-        </div>
+        )}
         <button onClick={() => setModalCierre({ cuenta: c })} className="w-full py-3 bg-indigo-600 text-white rounded-lg text-base font-medium">
           Cerrar Período
         </button>

@@ -129,16 +129,14 @@ export const useCalculations = () => {
   // ============================================
   
   /**
-   * DEUDA TOTAL = Saldos pendientes - Pagos aplicados (saldos a favor)
+   * DEUDA TOTAL = Saldos pendientes - Pagos a deuda
    */
   const totalDeuda = useMemo(() => {
     return cuentasContables.reduce((s, c) => {
       const deudaBruta = getTotalDeuda(c.id);
-      const saldoPeriodo = getSaldoPeriodo(c.id);
-      // Si hay saldo a favor, resta de la deuda
-      const saldoAFavor = saldoPeriodo < 0 ? Math.abs(saldoPeriodo) : 0;
-      const deudaReal = Math.max(0, deudaBruta - saldoAFavor);
-      return s + deudaReal;
+      const pagosADeuda = getPagosDeuda(c.id);
+      const deudaNeta = Math.max(0, deudaBruta - pagosADeuda);
+      return s + deudaNeta;
     }, 0);
   }, [cuentasContables, movimientos, pagos]);
   
@@ -173,39 +171,38 @@ export const useCalculations = () => {
 
   /**
    * Obtener resumen completo de una cuenta
-   * DEUDA REAL = deuda bruta - saldo a favor (si existe)
+   * SEPARACIÓN CLARA: pagos a deuda vs pagos a período
    */
   const getResumenCuenta = (cuentaId) => {
+    // DEUDA: saldos pendientes de períodos anteriores
     const deudaBruta = getTotalDeuda(cuentaId);
+    const pagosADeuda = getPagosDeuda(cuentaId);
+    const deudaNeta = Math.max(0, deudaBruta - pagosADeuda);
+    
+    // PERÍODO: consumos del mes actual
     const consumosPeriodo = getConsumosPeriodo(cuentaId);
-    const pagosPeriodo = getPagosPeriodo(cuentaId);
-    const saldoPeriodo = getSaldoPeriodo(cuentaId); // consumos - pagos
-    
-    // Si hay saldo a favor (pagos > consumos), se aplica a la deuda
-    const saldoAFavor = saldoPeriodo < 0 ? Math.abs(saldoPeriodo) : 0;
-    const deudaReal = Math.max(0, deudaBruta - saldoAFavor);
-    
-    // Consumos pendientes (si no hay saldo a favor)
+    const pagosAPeriodo = getPagosPeriodo(cuentaId);
+    const saldoPeriodo = consumosPeriodo - pagosAPeriodo;
     const consumosPendientes = Math.max(0, saldoPeriodo);
     
-    // Total = deuda real + consumos pendientes
-    const total = deudaReal + consumosPendientes;
+    // Total = deuda neta + consumos pendientes del período
+    const total = deudaNeta + consumosPendientes;
 
     return {
-      // Deuda
-      deudaBruta,           // Saldos pendientes sin descontar
-      deudaNeta: deudaReal, // Deuda real (ya con pagos descontados)
-      saldoAFavor,          // Monto aplicado a la deuda
+      // Deuda (períodos anteriores)
+      deudaBruta,           // Saldo pendiente original
+      pagosADeuda,          // Pagos aplicados a deuda
+      deudaNeta,            // Deuda después de pagos (deudaBruta - pagosADeuda)
       // Período actual
-      consumosPeriodo,      // Consumos del mes
-      pagosPeriodo,         // Pagos realizados
-      saldoPeriodo,         // consumos - pagos (puede ser negativo)
+      consumosPeriodo,      // Consumos del mes (cuotas, débitos, compras)
+      pagosAPeriodo,        // Pagos al período
+      saldoPeriodo,         // consumos - pagos período
       consumosPendientes,   // Lo que queda por pagar del período
       // Total
       total,
       // Estados
+      tieneDeuda: deudaNeta > 0,
       tieneSaldoAFavor: saldoPeriodo < 0,
-      tieneDeuda: deudaReal > 0,
       estaAlDia: total === 0
     };
   };

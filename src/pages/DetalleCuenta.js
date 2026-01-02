@@ -11,26 +11,16 @@ import { formatCurrency, formatDate } from '../utils/helpers';
 const DetalleCuenta = ({ cuenta, onBack, setModal, setCuentaEditar, setMovEditar, setPagoEditar, setModalCierre }) => {
   const { darkMode, theme } = useTheme();
   const { cuentas, movimientos, pagos, eliminarCuenta, eliminarMovimiento, eliminarPago } = useData();
-  const { getTotalDeuda, getConsumosPeriodo, getPagosPeriodo, getSaldoPeriodo } = useCalculations();
+  const { getResumenCuenta } = useCalculations();
 
   // Obtener cuenta actualizada
   const c = cuentas.find(cu => cu.id === cuenta.id) || cuenta;
   
-  // Cálculos correctos
-  const deudaBruta = getTotalDeuda(c.id);  // Saldos pendientes
-  const consumos = getConsumosPeriodo(c.id);  // Consumos del período (cuotas, débitos, compras)
-  const pagosTotal = getPagosPeriodo(c.id);  // Pagos realizados
-  const saldoPeriodo = getSaldoPeriodo(c.id);  // consumos - pagos
+  // Usar getResumenCuenta para cálculos consistentes
+  const { deudaNeta, pagosADeuda, consumosPeriodo, consumosPendientes, total, tieneDeuda } = getResumenCuenta(c.id);
   
-  // Si hay saldo a favor (pagos > consumos), se aplica a la deuda
-  const saldoAFavor = saldoPeriodo < 0 ? Math.abs(saldoPeriodo) : 0;
-  const deudaNeta = Math.max(0, deudaBruta - saldoAFavor);
-  
-  // Consumos pendientes del período (si pagos no cubren todo)
-  const consumosPendientes = Math.max(0, saldoPeriodo);
-  
-  // Total real a pagar
-  const total = deudaNeta + consumosPendientes;
+  // Para mostrar en UI: consumos del mes están cubiertos?
+  const consumosCubiertos = pagosTotal >= consumos && consumos > 0;
 
   // TODOS los movimientos no cerrados (incluye cuotas y saldos pendientes)
   const movsPeriodo = movimientos.filter(m => m.cuentaId === c.id && !m.periodoCerrado);
@@ -78,22 +68,22 @@ const DetalleCuenta = ({ cuenta, onBack, setModal, setCuentaEditar, setMovEditar
 
       {/* Resumen - Nueva visualización */}
       <div className={`rounded-xl p-4 ${darkMode ? 'bg-gray-800' : 'bg-slate-100'}`}>
-        {/* Si hay deuda, mostrar deuda neta */}
-        {deudaBruta > 0 ? (
+        {/* Si hay deuda, mostrar deuda + período */}
+        {tieneDeuda ? (
           <div className="grid grid-cols-3 gap-3 text-center mb-3">
             <div>
               <div className={`text-sm ${theme.textMuted}`}>🔴 Deuda</div>
               <div className="text-lg font-bold text-rose-500">{formatCurrency(deudaNeta)}</div>
-              {saldoAFavor > 0 && (
-                <div className="text-xs text-emerald-500">(-{formatCurrency(saldoAFavor)} aplicado)</div>
+              {pagosADeuda > 0 && (
+                <div className="text-xs text-emerald-500">(-{formatCurrency(pagosADeuda)})</div>
               )}
             </div>
             <div>
               <div className={`text-sm ${theme.textMuted}`}>🛒 Período</div>
-              <div className={`text-lg font-bold ${consumosPendientes > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>
+              <div className={`text-lg font-bold ${consumosPendientes > 0 ? 'text-amber-500' : consumosPeriodo > 0 ? 'text-emerald-500' : theme.textMuted}`}>
                 {formatCurrency(consumosPendientes)}
               </div>
-              {consumosPendientes === 0 && consumos > 0 && (
+              {consumosPendientes === 0 && consumosPeriodo > 0 && (
                 <div className="text-xs text-emerald-500">✓ Pagado</div>
               )}
             </div>
@@ -109,10 +99,10 @@ const DetalleCuenta = ({ cuenta, onBack, setModal, setCuentaEditar, setMovEditar
           <div className="flex justify-between items-center mb-3 px-4">
             <div className="text-center flex-1">
               <div className={`text-sm ${theme.textMuted}`}>🛒 Período</div>
-              <div className={`text-xl font-bold ${consumosPendientes > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>
+              <div className={`text-xl font-bold ${consumosPendientes > 0 ? 'text-amber-500' : consumosPeriodo > 0 ? 'text-emerald-500' : theme.textMuted}`}>
                 {formatCurrency(consumosPendientes)}
               </div>
-              {consumosPendientes === 0 && consumos > 0 && (
+              {consumosPendientes === 0 && consumosPeriodo > 0 && (
                 <div className="text-xs text-emerald-500">✓ Pagado</div>
               )}
             </div>

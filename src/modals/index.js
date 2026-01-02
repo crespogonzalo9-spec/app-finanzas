@@ -491,27 +491,25 @@ export const ModalPago = ({ onClose }) => {
   );
 };
 
-// MODAL DEUDAS - SOLO DEUDAS REALES (descontando pagos/saldo a favor)
+// MODAL DEUDAS - SOLO DEUDAS REALES (descontando pagos a deuda)
 export const ModalDeudas = ({ onClose }) => {
   const { darkMode, theme } = useTheme();
-  const { cuentasContables, getResumenCuenta, getMovimientosDeuda } = useCalculations();
+  const { cuentasContables, getResumenCuenta, getMovimientosDeuda, getPagosDeuda } = useCalculations();
   
-  // Calcular deuda real por cuenta (deuda bruta - saldo a favor si existe)
+  // Calcular deuda real por cuenta (deuda bruta - pagos a deuda)
   const cuentasConDeuda = cuentasContables
     .map(c => {
       const r = getResumenCuenta(c.id);
       const deudas = getMovimientosDeuda(c.id);
       const deudaBruta = deudas.reduce((s, d) => s + d.monto, 0);
-      
-      // Si hay saldo a favor (período negativo), se resta de la deuda
-      const saldoAFavor = r.tieneSaldoAFavor ? Math.abs(r.saldoPeriodo) : 0;
-      const deudaReal = Math.max(0, deudaBruta - saldoAFavor);
+      const pagosADeuda = getPagosDeuda(c.id);
+      const deudaReal = Math.max(0, deudaBruta - pagosADeuda);
       
       return {
         cuenta: c,
         deudas,
         deudaBruta,
-        saldoAFavor,
+        pagosADeuda,
         deudaReal
       };
     })
@@ -535,7 +533,7 @@ export const ModalDeudas = ({ onClose }) => {
               <p className="text-sm mt-2">Todos los períodos anteriores están pagados</p>
             </div>
           ) : (
-            cuentasConDeuda.map(({ cuenta, deudas, deudaBruta, saldoAFavor, deudaReal }) => (
+            cuentasConDeuda.map(({ cuenta, deudas, deudaBruta, pagosADeuda, deudaReal }) => (
               <div key={cuenta.id} className={`p-4 rounded-xl border ${theme.border}`}>
                 <div className="flex items-center gap-4 mb-3">
                   <EntidadLogo entidad={cuenta.entidad} size={40} />
@@ -550,11 +548,11 @@ export const ModalDeudas = ({ onClose }) => {
                   </div>
                 ))}
                 
-                {/* Mostrar descuento si hay saldo a favor */}
-                {saldoAFavor > 0 && (
+                {/* Mostrar pagos aplicados a deuda */}
+                {pagosADeuda > 0 && (
                   <div className={`flex justify-between items-center p-2 rounded-lg mb-2 ${darkMode ? 'bg-emerald-900/30' : 'bg-emerald-50'}`}>
-                    <span className={`text-sm ${theme.text}`}>Pagos aplicados</span>
-                    <span className="font-bold text-emerald-500">- {formatCurrency(saldoAFavor)}</span>
+                    <span className={`text-sm ${theme.text}`}>Pagos a deuda</span>
+                    <span className="font-bold text-emerald-500">- {formatCurrency(pagosADeuda)}</span>
                   </div>
                 )}
                 

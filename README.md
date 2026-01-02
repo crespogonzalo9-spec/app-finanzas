@@ -1,16 +1,17 @@
-# Monity v4.9.0
+# Monity 💰
 
-Sistema de gestión de finanzas personales para Argentina.
+Tu asistente de finanzas personales.
 
 ## Características
 
-- ✅ Múltiples tarjetas de crédito
-- ✅ Cuotas con seguimiento automático
-- ✅ Débitos automáticos
-- ✅ Gestión de deudas (saldos pendientes)
-- ✅ Cálculo correcto: Deuda real = Saldos pendientes - Pagos aplicados
-- ✅ Cierre de períodos
-- ✅ Dark mode
+- ✅ **Cuentas contables**: Tarjetas de crédito, préstamos, etc.
+- ✅ **Períodos de consumo**: Gestión automática de ciclos
+- ✅ **Cuotas**: Carga y seguimiento automático mes a mes
+- ✅ **Editar/Eliminar consumos**: Control total de tus gastos
+- ✅ **Alertas configurables**: Gasto alto, % de ingresos, cierre de período
+- ✅ **Notificaciones Push**: Alertas en tu dispositivo
+- ✅ **PWA instalable**: Usala como app nativa en Android/iOS
+- ✅ **Modo oscuro**: Interfaz adaptable
 
 ## Instalación
 
@@ -19,12 +20,18 @@ npm install
 npm start
 ```
 
-## Deploy
+## Deploy en Vercel
 
-```bash
-npm run build
-```
+1. Subir a GitHub
+2. Conectar con Vercel
+3. Deploy automático
 
-## Modelo Contable
+## PWA
 
-Ver `MODELO_CONTABLE.md` para documentación detallada del sistema de cálculos.
+La app es instalable en:
+- **Android**: Menú del navegador → "Agregar a pantalla de inicio"
+- **iOS**: Safari → Compartir → "Agregar a pantalla de inicio"
+
+## Licencia
+
+MIT

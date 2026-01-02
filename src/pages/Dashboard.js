@@ -158,7 +158,7 @@ const Dashboard = ({ setModal, setCuentaEditar, setCuentaActiva, setTab, setCuot
         {/* Grid de cuentas - responsive */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {cuentasContables.map(c => {
-            const { deudaNeta, pagosADeuda, consumosPeriodo, consumosPendientes, total, tieneDeuda } = getResumenCuenta(c.id);
+            const { deudaNeta, pagosADeuda, consumosPeriodo, pagosAPeriodo, consumosPendientes, total, tieneDeuda } = getResumenCuenta(c.id);
             const sinFechas = !c.cierreActual;
             
             return (
@@ -229,14 +229,12 @@ const Dashboard = ({ setModal, setCuentaEditar, setCuentaActiva, setTab, setCuot
                       <div className="flex justify-between items-center">
                         <div>
                           <div className={`text-sm ${theme.textMuted}`}>🛒 Período actual</div>
-                          <div className={`text-xl font-bold ${consumosCubiertos ? 'text-emerald-500' : consumosPeriodo > 0 ? 'text-amber-500' : theme.textMuted}`}>
-                            {formatCurrency(consumosPeriodo)}
+                          <div className={`text-xl font-bold ${consumosPendientes > 0 ? 'text-amber-500' : consumosPeriodo > 0 ? 'text-emerald-500' : theme.textMuted}`}>
+                            {formatCurrency(consumosPendientes)}
                           </div>
-                          {consumosCubiertos ? (
-                            <div className="text-xs text-emerald-400">✓ Cubierto</div>
-                          ) : consumosPendientes > 0 && consumosPendientes < consumosPeriodo ? (
-                            <div className="text-xs text-amber-400">Pendiente: {formatCurrency(consumosPendientes)}</div>
-                          ) : null}
+                          {consumosPendientes === 0 && consumosPeriodo > 0 && (
+                            <div className="text-xs text-emerald-400">✓ Pagado</div>
+                          )}
                         </div>
                         <div className="text-right">
                           <div className={`text-sm ${theme.textMuted}`}>Total</div>

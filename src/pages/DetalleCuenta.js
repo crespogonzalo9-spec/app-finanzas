@@ -17,10 +17,7 @@ const DetalleCuenta = ({ cuenta, onBack, setModal, setCuentaEditar, setMovEditar
   const c = cuentas.find(cu => cu.id === cuenta.id) || cuenta;
   
   // Usar getResumenCuenta para cálculos consistentes
-  const { deudaNeta, pagosADeuda, consumosPeriodo, consumosPendientes, total, tieneDeuda } = getResumenCuenta(c.id);
-  
-  // Para mostrar en UI: consumos del mes están cubiertos?
-  const consumosCubiertos = pagosTotal >= consumos && consumos > 0;
+  const { deudaNeta, pagosADeuda, consumosPeriodo, pagosAPeriodo, consumosPendientes, total, tieneDeuda } = getResumenCuenta(c.id);
 
   // TODOS los movimientos no cerrados (incluye cuotas y saldos pendientes)
   const movsPeriodo = movimientos.filter(m => m.cuentaId === c.id && !m.periodoCerrado);

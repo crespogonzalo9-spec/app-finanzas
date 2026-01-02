@@ -314,16 +314,17 @@ export const ModalConsumo = ({ onClose }) => {
   );
 };
 
-// MODAL DÉBITO
+// MODAL DÉBITO - Genera movimiento al crear
 export const ModalDebito = ({ onClose }) => {
   const { theme } = useTheme();
-  const { guardarDebito, cuentas } = useData();
+  const { guardarDebito, guardarMovimiento, cuentas } = useData();
   const { cuentasContables } = useCalculations();
   const [cuentaId, setCuentaId] = useState('');
   const [desc, setDesc] = useState('');
   const [monto, setMonto] = useState('');
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState('');
+  const [generarAhora, setGenerarAhora] = useState(true); // Por defecto genera el consumo
   
   const guardar = async () => {
     if (!cuentaId || !desc || !monto) {
@@ -334,13 +335,30 @@ export const ModalDebito = ({ onClose }) => {
     setError('');
     try {
       const cuenta = cuentas.find(c => c.id === cuentaId);
-      await guardarDebito({ 
+      const montoNum = parseFloat(monto);
+      
+      // Guardar el débito automático
+      const debitoId = await guardarDebito({ 
         cuentaId, 
         descripcion: desc, 
-        monto: parseFloat(monto), 
+        monto: montoNum, 
         cuentaNombre: cuenta?.nombre,
         activo: true
       });
+      
+      // Si está marcado, generar el movimiento del período actual
+      if (generarAhora) {
+        await guardarMovimiento({
+          cuentaId,
+          descripcion: desc,
+          monto: montoNum,
+          categoria: 'debito_auto',
+          fecha: today(),
+          esDebitoAuto: true,
+          debitoId
+        });
+      }
+      
       onClose();
     } catch (e) {
       console.error('Error guardando débito:', e);
@@ -376,6 +394,15 @@ export const ModalDebito = ({ onClose }) => {
             <label className={`text-base mb-2 block ${theme.textMuted}`}>Monto mensual</label>
             <input type="number" value={monto} onChange={e => setMonto(e.target.value)} placeholder="0" className={`w-full p-4 border rounded-xl text-lg ${theme.input}`} />
           </div>
+          
+          {/* Opción de generar ahora */}
+          <label className={`flex items-center gap-4 p-4 rounded-xl cursor-pointer border-2 ${generarAhora ? 'border-yellow-500 bg-yellow-500/10' : theme.border}`}>
+            <input type="checkbox" checked={generarAhora} onChange={e => setGenerarAhora(e.target.checked)} className="w-6 h-6 accent-yellow-500" />
+            <div>
+              <span className={`text-lg font-medium ${theme.text}`}>Cargar en período actual</span>
+              <p className={`text-sm ${theme.textMuted}`}>Agrega el consumo de este mes ahora</p>
+            </div>
+          </label>
         </div>
         <div className={`p-5 border-t flex gap-4 ${theme.border}`}>
           <button onClick={onClose} className={`flex-1 p-4 border rounded-xl text-lg ${theme.border} ${theme.text}`}>Cancelar</button>
@@ -464,29 +491,97 @@ export const ModalPago = ({ onClose }) => {
   );
 };
 
-// MODAL DEUDAS
+// MODAL DEUDAS - SOLO DEUDAS REALES (descontando pagos/saldo a favor)
 export const ModalDeudas = ({ onClose }) => {
   const { darkMode, theme } = useTheme();
-  const { cuentasContables, getResumenCuenta } = useCalculations();
-  let totalDeuda = 0, totalPeriodo = 0, totalGeneral = 0;
-  cuentasContables.forEach(c => { const r = getResumenCuenta(c.id); totalDeuda += r.deudaNeta; totalPeriodo += Math.max(0, r.saldoPeriodo); totalGeneral += r.total; });
+  const { cuentasContables, getResumenCuenta, getMovimientosDeuda } = useCalculations();
+  
+  // Calcular deuda real por cuenta (deuda bruta - saldo a favor si existe)
+  const cuentasConDeuda = cuentasContables
+    .map(c => {
+      const r = getResumenCuenta(c.id);
+      const deudas = getMovimientosDeuda(c.id);
+      const deudaBruta = deudas.reduce((s, d) => s + d.monto, 0);
+      
+      // Si hay saldo a favor (período negativo), se resta de la deuda
+      const saldoAFavor = r.tieneSaldoAFavor ? Math.abs(r.saldoPeriodo) : 0;
+      const deudaReal = Math.max(0, deudaBruta - saldoAFavor);
+      
+      return {
+        cuenta: c,
+        deudas,
+        deudaBruta,
+        saldoAFavor,
+        deudaReal
+      };
+    })
+    .filter(x => x.deudaReal > 0);
+  
+  const totalDeudaReal = cuentasConDeuda.reduce((s, x) => s + x.deudaReal, 0);
+  
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div className={`rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col ${theme.card}`} onClick={e => e.stopPropagation()}>
-        <div className={`p-5 border-b flex justify-between ${theme.border}`}><h3 className={`font-bold text-xl ${theme.text}`}>Resumen</h3><button onClick={onClose}><X className={`w-7 h-7 ${theme.text}`} /></button></div>
+        <div className={`p-5 border-b flex justify-between ${theme.border}`}>
+          <h3 className={`font-bold text-xl ${theme.text}`}>🔴 Deudas Pendientes</h3>
+          <button onClick={onClose}><X className={`w-7 h-7 ${theme.text}`} /></button>
+        </div>
+        
         <div className="p-5 overflow-y-auto flex-1 space-y-4">
-          {cuentasContables.map(c => { const r = getResumenCuenta(c.id); return (
-            <div key={c.id} className={`p-4 rounded-xl border ${theme.border}`}>
-              <div className="flex items-center gap-4 mb-3"><EntidadLogo entidad={c.entidad} size={48} /><span className={`font-bold text-lg ${theme.text}`}>{c.nombre}</span></div>
-              <div className={`grid grid-cols-3 gap-3 text-center p-3 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
-                <div><div className={`text-sm ${theme.textMuted}`}>Deuda</div><div className={`text-lg font-bold ${r.deudaNeta > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(r.deudaNeta)}</div></div>
-                <div><div className={`text-sm ${theme.textMuted}`}>Período</div><div className={`text-lg font-bold ${r.saldoPeriodo > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>{r.tieneSaldoAFavor && '-'}{formatCurrency(Math.abs(r.saldoPeriodo))}</div></div>
-                <div><div className={`text-sm ${theme.textMuted}`}>Total</div><div className={`text-lg font-bold ${r.total > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(r.total)}</div></div>
+          {cuentasConDeuda.length === 0 ? (
+            <div className={`text-center py-8 ${theme.textMuted}`}>
+              <div className="text-4xl mb-3">✅</div>
+              <p className="text-lg">No tenés deudas pendientes</p>
+              <p className="text-sm mt-2">Todos los períodos anteriores están pagados</p>
+            </div>
+          ) : (
+            cuentasConDeuda.map(({ cuenta, deudas, deudaBruta, saldoAFavor, deudaReal }) => (
+              <div key={cuenta.id} className={`p-4 rounded-xl border ${theme.border}`}>
+                <div className="flex items-center gap-4 mb-3">
+                  <EntidadLogo entidad={cuenta.entidad} size={40} />
+                  <span className={`font-bold text-base ${theme.text}`}>{cuenta.nombre}</span>
+                </div>
+                
+                {/* Lista de saldos pendientes */}
+                {deudas.map(d => (
+                  <div key={d.id} className={`flex justify-between items-center p-2 rounded-lg mb-2 ${darkMode ? 'bg-rose-900/30' : 'bg-rose-50'}`}>
+                    <span className={`text-sm ${theme.text}`}>{d.descripcion}</span>
+                    <span className="font-bold text-rose-500">{formatCurrency(d.monto)}</span>
+                  </div>
+                ))}
+                
+                {/* Mostrar descuento si hay saldo a favor */}
+                {saldoAFavor > 0 && (
+                  <div className={`flex justify-between items-center p-2 rounded-lg mb-2 ${darkMode ? 'bg-emerald-900/30' : 'bg-emerald-50'}`}>
+                    <span className={`text-sm ${theme.text}`}>Pagos aplicados</span>
+                    <span className="font-bold text-emerald-500">- {formatCurrency(saldoAFavor)}</span>
+                  </div>
+                )}
+                
+                {/* Total de la cuenta */}
+                <div className={`flex justify-between items-center mt-3 pt-3 border-t ${theme.border}`}>
+                  <span className={`font-semibold ${theme.text}`}>Deuda real:</span>
+                  <span className="font-bold text-lg text-rose-500">{formatCurrency(deudaReal)}</span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+        
+        {/* Total general */}
+        {cuentasConDeuda.length > 0 && (
+          <div className={`p-5 border-t ${theme.border}`}>
+            <div className={`p-4 rounded-xl ${darkMode ? 'bg-rose-900/30' : 'bg-rose-50'}`}>
+              <div className="flex justify-between items-center">
+                <span className={`font-bold ${theme.text}`}>🔴 TOTAL DEUDA:</span>
+                <span className="font-bold text-2xl text-rose-500">{formatCurrency(totalDeudaReal)}</span>
               </div>
             </div>
-          ); })}
-        </div>
-        <div className={`p-5 border-t ${theme.border}`}><div className={`p-4 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}><div className="grid grid-cols-3 gap-4 text-center"><div><div className={`text-sm ${theme.textMuted}`}>Deuda</div><div className="font-bold text-xl text-rose-500">{formatCurrency(totalDeuda)}</div></div><div><div className={`text-sm ${theme.textMuted}`}>Período</div><div className="font-bold text-xl text-amber-500">{formatCurrency(totalPeriodo)}</div></div><div><div className={`text-sm ${theme.textMuted}`}>TOTAL</div><div className="font-bold text-2xl text-rose-500">{formatCurrency(totalGeneral)}</div></div></div></div></div>
+            <p className={`mt-3 text-xs ${theme.textMuted}`}>
+              Deuda neta después de aplicar pagos realizados
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

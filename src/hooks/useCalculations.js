@@ -30,13 +30,14 @@ export const useCalculations = () => {
   // ============================================
 
   /**
-   * DEUDA = Saldos pendientes de períodos anteriores
+   * DEUDA = SOLO saldos pendientes de períodos anteriores
    * Son movimientos con esSaldoPendiente=true que no están cerrados
+   * NO incluye cuotas, débitos ni consumos del período actual
    */
   const getMovimientosDeuda = (cuentaId) => 
     movimientos.filter(m => 
       m.cuentaId === cuentaId && 
-      m.esSaldoPendiente && 
+      m.esSaldoPendiente === true && 
       !m.periodoCerrado && 
       m.monto > 0
     );
@@ -46,20 +47,22 @@ export const useCalculations = () => {
 
   /**
    * CONSUMOS DEL PERÍODO = Movimientos del período actual
-   * NO incluye saldos pendientes (esos son deuda)
+   * Incluye: cuotas, débitos automáticos, compras normales
+   * NO incluye: saldos pendientes (esos son deuda)
    */
-  const getConsumosPeriodo = (cuentaId) => {
-    return movimientos
-      .filter(m => 
-        m.cuentaId === cuentaId && 
-        !m.periodoCerrado && 
-        !m.esSaldoPendiente
-      )
-      .reduce((s, m) => s + (m.monto || 0), 0);
-  };
+  const getMovimientosConsumo = (cuentaId) =>
+    movimientos.filter(m => 
+      m.cuentaId === cuentaId && 
+      !m.periodoCerrado && 
+      !m.esSaldoPendiente
+    );
+
+  const getConsumosPeriodo = (cuentaId) => 
+    getMovimientosConsumo(cuentaId).reduce((s, m) => s + (m.monto || 0), 0);
 
   /**
-   * PAGOS DEL PERÍODO = Pagos que no son para deuda
+   * PAGOS DEL PERÍODO = Pagos que NO son para deuda
+   * Son pagos del ciclo actual de la tarjeta
    */
   const getPagosPeriodo = (cuentaId) => {
     return pagos
@@ -71,51 +74,52 @@ export const useCalculations = () => {
   };
 
   /**
-   * PAGOS A DEUDA = Pagos marcados como esParaDeuda
+   * PAGOS A DEUDA = Pagos específicamente marcados para deuda
+   * Estos reducen los saldos pendientes
    */
   const getPagosDeuda = (cuentaId) => {
     return pagos
       .filter(pg => 
         pg.cuentaId === cuentaId && 
-        pg.esParaDeuda
+        pg.esParaDeuda === true
       )
       .reduce((s, pg) => s + (pg.monto || 0), 0);
   };
 
   /**
-   * SALDO DEL PERÍODO = Consumos - Pagos
+   * SALDO DEL PERÍODO = Consumos - Pagos del período
    * Puede ser:
    *   > 0: Debo del período actual
    *   < 0: Tengo saldo a favor (pagué de más)
-   *   = 0: Estoy al día
+   *   = 0: Estoy al día con el período
    */
   const getSaldoPeriodo = (cuentaId) => {
     return getConsumosPeriodo(cuentaId) - getPagosPeriodo(cuentaId);
   };
 
   /**
-   * DEUDA NETA = Deuda total - Pagos a deuda
+   * DEUDA NETA = Deuda total - Pagos aplicados a deuda
+   * Los pagos a deuda ya redujeron el monto del saldo pendiente en la BD,
+   * pero por si acaso calculamos la diferencia
    */
   const getDeudaNeta = (cuentaId) => {
-    const deudaTotal = getTotalDeuda(cuentaId);
-    const pagosADeuda = getPagosDeuda(cuentaId);
-    return Math.max(0, deudaTotal - pagosADeuda);
+    // La deuda ya está reducida en los movimientos cuando se aplica un pago
+    // porque actualizamos el monto del saldo pendiente
+    return getTotalDeuda(cuentaId);
   };
 
   /**
-   * TOTAL A PAGAR = Lo que realmente debo
-   * 
-   * Lógica:
-   * - Si tengo saldo a favor en el período (< 0), se aplica a la deuda
-   * - El total nunca puede ser menor a 0
+   * TOTAL A PAGAR = Deuda + Saldo Período
+   * Si el período tiene saldo a favor (negativo), SE RESTA de la deuda
+   * El total nunca puede ser menor a 0
    */
   const getTotal = (cuentaId) => {
-    const deudaNeta = getDeudaNeta(cuentaId);
+    const deuda = getDeudaNeta(cuentaId);
     const saldoPeriodo = getSaldoPeriodo(cuentaId);
     
-    // Si el saldo del período es negativo (saldo a favor),
-    // ese excedente reduce la deuda
-    const total = deudaNeta + saldoPeriodo;
+    // Total = Deuda + Saldo período (puede ser negativo si hay saldo a favor)
+    // Si saldoPeriodo es -400.000 y deuda es 933.000, total = 533.000
+    const total = deuda + saldoPeriodo;
     
     return Math.max(0, total);
   };
@@ -125,39 +129,43 @@ export const useCalculations = () => {
   // ============================================
   
   /**
-   * DEUDA TOTAL = Suma de deuda neta de todas las cuentas
+   * DEUDA TOTAL = Saldos pendientes - Pagos aplicados (saldos a favor)
    */
   const totalDeuda = useMemo(() => {
     return cuentasContables.reduce((s, c) => {
-      const deudaNeta = getDeudaNeta(c.id);
+      const deudaBruta = getTotalDeuda(c.id);
       const saldoPeriodo = getSaldoPeriodo(c.id);
-      
-      // Si hay saldo a favor, reduce la deuda de esta cuenta
-      if (saldoPeriodo < 0) {
-        return s + Math.max(0, deudaNeta + saldoPeriodo);
-      }
-      return s + deudaNeta;
+      // Si hay saldo a favor, resta de la deuda
+      const saldoAFavor = saldoPeriodo < 0 ? Math.abs(saldoPeriodo) : 0;
+      const deudaReal = Math.max(0, deudaBruta - saldoAFavor);
+      return s + deudaReal;
     }, 0);
   }, [cuentasContables, movimientos, pagos]);
   
   /**
-   * CONSUMOS TOTAL = Suma de saldos de período positivos
-   * (Solo lo que debo del período actual, no incluye saldos a favor)
+   * CONSUMOS TOTAL = Solo consumos del período actual (positivos)
    */
   const totalConsumos = useMemo(() => {
     return cuentasContables.reduce((s, c) => {
-      const saldoPeriodo = getSaldoPeriodo(c.id);
-      return s + Math.max(0, saldoPeriodo);
+      const saldo = getSaldoPeriodo(c.id);
+      return s + Math.max(0, saldo);
     }, 0);
   }, [cuentasContables, movimientos, pagos]);
   
   /**
-   * DISPONIBLE = Lo que me queda después de pagar todo
+   * TOTAL A PAGAR = Suma de totales de cada cuenta
+   * Cada cuenta ya considera el saldo a favor restando de la deuda
+   */
+  const totalAPagar = useMemo(() => {
+    return cuentasContables.reduce((s, c) => s + getTotal(c.id), 0);
+  }, [cuentasContables, movimientos, pagos]);
+
+  /**
+   * DISPONIBLE = Ingresos - Total a pagar
    */
   const disponible = useMemo(() => {
-    const totalAPagar = cuentasContables.reduce((s, c) => s + getTotal(c.id), 0);
     return totalIngresos - totalAPagar;
-  }, [totalIngresos, cuentasContables, movimientos, pagos]);
+  }, [totalIngresos, totalAPagar]);
 
   // ============================================
   // FUNCIONES PARA UI
@@ -168,7 +176,6 @@ export const useCalculations = () => {
    */
   const getResumenCuenta = (cuentaId) => {
     const deudaBruta = getTotalDeuda(cuentaId);
-    const pagosADeuda = getPagosDeuda(cuentaId);
     const deudaNeta = getDeudaNeta(cuentaId);
     const consumosPeriodo = getConsumosPeriodo(cuentaId);
     const pagosPeriodo = getPagosPeriodo(cuentaId);
@@ -176,11 +183,10 @@ export const useCalculations = () => {
     const total = getTotal(cuentaId);
 
     return {
-      // Deuda
+      // Deuda (saldos pendientes de períodos anteriores)
       deudaBruta,
-      pagosADeuda,
       deudaNeta,
-      // Período
+      // Período actual
       consumosPeriodo,
       pagosPeriodo,
       saldoPeriodo,
@@ -201,6 +207,7 @@ export const useCalculations = () => {
     totalIngresos,
     totalDeuda,
     totalConsumos,
+    totalAPagar,
     disponible,
     // Funciones por cuenta
     tieneFechas,
@@ -212,6 +219,7 @@ export const useCalculations = () => {
     getDeudaNeta,
     getTotal,
     getMovimientosDeuda,
+    getMovimientosConsumo,
     getResumenCuenta,
     // Aliases para compatibilidad
     getDeudaReal: getDeudaNeta,

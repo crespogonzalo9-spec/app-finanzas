@@ -15,7 +15,8 @@ const Dashboard = ({ setModal, setCuentaEditar, setCuentaActiva, setTab, setCuot
     cuentasContables, 
     totalIngresos, 
     totalDeuda, 
-    totalConsumos, 
+    totalConsumos,
+    totalAPagar,
     disponible,
     getResumenCuenta
   } = useCalculations();
@@ -23,36 +24,30 @@ const Dashboard = ({ setModal, setCuentaEditar, setCuentaActiva, setTab, setCuot
   const cuotasActivas = cuotas.filter(c => c.estado === 'activa');
   const debitosActivos = (debitos || []).filter(d => d.activo !== false);
 
-  // Calcular total real a pagar (para mostrar en resumen)
-  const totalAPagar = cuentasContables.reduce((s, c) => {
-    const { total } = getResumenCuenta(c.id);
-    return s + total;
-  }, 0);
-
   return (
     <div className="space-y-6">
-      {/* Resumen - Grid responsive */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <button onClick={() => setModal('ingreso')} className={`p-5 rounded-2xl text-left shadow-lg transition-transform active:scale-95 ${darkMode ? 'bg-gradient-to-br from-emerald-800 to-emerald-900' : 'bg-gradient-to-br from-emerald-50 to-emerald-100'}`}>
-          <div className={`text-sm font-medium uppercase tracking-wide ${darkMode ? 'text-emerald-300' : 'text-emerald-600'}`}>💰 Ingresos</div>
-          <div className={`text-2xl font-bold mt-2 ${darkMode ? 'text-white' : 'text-emerald-700'}`}>{formatCurrency(totalIngresos)}</div>
-          <div className={`text-sm mt-2 ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>+ Agregar</div>
+      {/* Resumen - Grid responsive con texto ajustado */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
+        <button onClick={() => setModal('ingreso')} className={`p-4 lg:p-5 rounded-2xl text-left shadow-lg transition-transform active:scale-95 ${darkMode ? 'bg-gradient-to-br from-emerald-800 to-emerald-900' : 'bg-gradient-to-br from-emerald-50 to-emerald-100'}`}>
+          <div className={`text-xs lg:text-sm font-medium uppercase tracking-wide ${darkMode ? 'text-emerald-300' : 'text-emerald-600'}`}>💰 Ingresos</div>
+          <div className={`text-lg lg:text-2xl font-bold mt-1 lg:mt-2 truncate ${darkMode ? 'text-white' : 'text-emerald-700'}`}>{formatCurrency(totalIngresos)}</div>
+          <div className={`text-xs lg:text-sm mt-1 lg:mt-2 ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>+ Agregar</div>
         </button>
         
-        <button onClick={() => setModal('deudas')} className={`p-5 rounded-2xl text-left shadow-lg transition-transform active:scale-95 ${darkMode ? 'bg-gradient-to-br from-rose-800 to-rose-900' : 'bg-gradient-to-br from-rose-50 to-rose-100'}`}>
-          <div className={`text-sm font-medium uppercase tracking-wide ${darkMode ? 'text-rose-300' : 'text-rose-600'}`}>🔴 Total a Pagar</div>
-          <div className={`text-2xl font-bold mt-2 ${darkMode ? 'text-white' : 'text-rose-700'}`}>{formatCurrency(totalAPagar)}</div>
-          <div className={`text-sm mt-2 ${darkMode ? 'text-rose-400' : 'text-rose-600'}`}>Ver detalle</div>
+        <button onClick={() => setModal('deudas')} className={`p-4 lg:p-5 rounded-2xl text-left shadow-lg transition-transform active:scale-95 ${darkMode ? 'bg-gradient-to-br from-rose-800 to-rose-900' : 'bg-gradient-to-br from-rose-50 to-rose-100'}`}>
+          <div className={`text-xs lg:text-sm font-medium uppercase tracking-wide ${darkMode ? 'text-rose-300' : 'text-rose-600'}`}>🔴 Deuda</div>
+          <div className={`text-lg lg:text-2xl font-bold mt-1 lg:mt-2 truncate ${darkMode ? 'text-white' : 'text-rose-700'}`}>{formatCurrency(totalDeuda)}</div>
+          <div className={`text-xs lg:text-sm mt-1 lg:mt-2 ${darkMode ? 'text-rose-400' : 'text-rose-600'}`}>Ver detalle</div>
         </button>
         
-        <div className={`p-5 rounded-2xl shadow-lg ${darkMode ? 'bg-gradient-to-br from-amber-800 to-amber-900' : 'bg-gradient-to-br from-amber-50 to-amber-100'}`}>
-          <div className={`text-sm font-medium uppercase tracking-wide ${darkMode ? 'text-amber-300' : 'text-amber-600'}`}>🛒 Consumos Período</div>
-          <div className={`text-2xl font-bold mt-2 ${darkMode ? 'text-white' : 'text-amber-700'}`}>{formatCurrency(totalConsumos)}</div>
+        <div className={`p-4 lg:p-5 rounded-2xl shadow-lg ${darkMode ? 'bg-gradient-to-br from-amber-800 to-amber-900' : 'bg-gradient-to-br from-amber-50 to-amber-100'}`}>
+          <div className={`text-xs lg:text-sm font-medium uppercase tracking-wide ${darkMode ? 'text-amber-300' : 'text-amber-600'}`}>🛒 Período</div>
+          <div className={`text-lg lg:text-2xl font-bold mt-1 lg:mt-2 truncate ${darkMode ? 'text-white' : 'text-amber-700'}`}>{formatCurrency(totalConsumos)}</div>
         </div>
         
-        <div className={`p-5 rounded-2xl shadow-lg ${darkMode ? 'bg-gradient-to-br from-blue-800 to-blue-900' : 'bg-gradient-to-br from-blue-50 to-blue-100'}`}>
-          <div className={`text-sm font-medium uppercase tracking-wide ${darkMode ? 'text-blue-300' : 'text-blue-600'}`}>💵 Disponible</div>
-          <div className={`text-2xl font-bold mt-2 ${disponible >= 0 ? (darkMode ? 'text-white' : 'text-blue-700') : 'text-rose-500'}`}>{formatCurrency(disponible)}</div>
+        <div className={`p-4 lg:p-5 rounded-2xl shadow-lg ${darkMode ? 'bg-gradient-to-br from-blue-800 to-blue-900' : 'bg-gradient-to-br from-blue-50 to-blue-100'}`}>
+          <div className={`text-xs lg:text-sm font-medium uppercase tracking-wide ${darkMode ? 'text-blue-300' : 'text-blue-600'}`}>💵 Disponible</div>
+          <div className={`text-lg lg:text-2xl font-bold mt-1 lg:mt-2 truncate ${disponible >= 0 ? (darkMode ? 'text-white' : 'text-blue-700') : 'text-rose-500'}`}>{formatCurrency(disponible)}</div>
         </div>
       </div>
 
@@ -193,21 +188,20 @@ const Dashboard = ({ setModal, setCuentaEditar, setCuentaActiva, setTab, setCuot
                       ⚠️ Configurá fecha de cierre
                     </div>
                   </div>
-                ) : (
+                ) : deudaNeta > 0 ? (
+                  /* SI HAY DEUDA: Mostrar Deuda + Período + Total */
                   <>
                     <div className={`grid grid-cols-3 gap-3 p-4 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
                       <div className="text-center">
-                        <div className={`text-sm ${theme.textMuted}`}>Deuda</div>
-                        <div className={`text-lg font-bold ${deudaNeta > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                        <div className={`text-sm ${theme.textMuted}`}>🔴 Deuda</div>
+                        <div className="text-lg font-bold text-rose-500">
                           {formatCurrency(deudaNeta)}
                         </div>
                       </div>
                       <div className="text-center">
                         <div className={`text-sm ${theme.textMuted}`}>Período</div>
                         <div className={`text-lg font-bold ${
-                          saldoPeriodo > 0 ? 'text-amber-500' : 
-                          saldoPeriodo < 0 ? 'text-emerald-500' : 
-                          'text-emerald-500'
+                          saldoPeriodo > 0 ? 'text-amber-500' : 'text-emerald-500'
                         }`}>
                           {tieneSaldoAFavor && '-'}{formatCurrency(Math.abs(saldoPeriodo))}
                         </div>
@@ -219,6 +213,35 @@ const Dashboard = ({ setModal, setCuentaEditar, setCuentaActiva, setTab, setCuot
                         <div className={`text-sm ${theme.textMuted}`}>Total</div>
                         <div className={`text-lg font-bold ${total > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
                           {formatCurrency(total)}
+                        </div>
+                      </div>
+                    </div>
+                    <div className={`flex justify-between text-sm mt-3 ${theme.textMuted}`}>
+                      <span>🗓️ Cierre: {formatDate(c.cierreActual)}</span>
+                      <span>⏰ Vence: {formatDate(c.vencimientoActual)}</span>
+                    </div>
+                  </>
+                ) : (
+                  /* SIN DEUDA: Mostrar solo Período y Total */
+                  <>
+                    <div className={`p-4 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-slate-100'}`}>
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <div className={`text-sm ${theme.textMuted}`}>🛒 Período actual</div>
+                          <div className={`text-xl font-bold ${
+                            saldoPeriodo > 0 ? 'text-amber-500' : 'text-emerald-500'
+                          }`}>
+                            {tieneSaldoAFavor && '-'}{formatCurrency(Math.abs(saldoPeriodo))}
+                          </div>
+                          {tieneSaldoAFavor && (
+                            <div className="text-xs text-emerald-400">✓ Saldo a favor</div>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <div className={`text-sm ${theme.textMuted}`}>Total</div>
+                          <div className={`text-2xl font-bold ${total > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>
+                            {formatCurrency(total)}
+                          </div>
                         </div>
                       </div>
                     </div>
